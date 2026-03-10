@@ -459,7 +459,10 @@ deploy_falcon() {
         --set falcon-image-analyzer.crowdstrikeConfig.clientID=$FALCON_CLIENT_ID \
         --set falcon-image-analyzer.crowdstrikeConfig.clientSecret=$FALCON_CLIENT_SECRET"
     else
-        helm_cmd="$helm_cmd --set falcon-image-analyzer.deployment.enabled=false"
+        helm_cmd="$helm_cmd --set falcon-image-analyzer.deployment.enabled=false \\
+        --set falcon-image-analyzer.crowdstrikeConfig.clusterName=$CLUSTERNAME \\
+        --set falcon-image-analyzer.crowdstrikeConfig.clientID=$FALCON_CLIENT_ID \\
+        --set falcon-image-analyzer.crowdstrikeConfig.clientSecret=$FALCON_CLIENT_SECRET"
     fi
 
     # Execute the deployment command with conditional verbosity and progress indication
