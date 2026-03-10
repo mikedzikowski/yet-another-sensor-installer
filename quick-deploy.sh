@@ -16,6 +16,12 @@
 
 set -e
 
+# Component selection variables
+INSTALL_SENSOR="true"
+INSTALL_KAC="true"
+INSTALL_IAR="true"
+IS_GKE_AUTOPILOT="false"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -43,6 +49,61 @@ check_root() {
             exit 1
         fi
     fi
+}
+
+# Interactive component selection
+select_components() {
+    log_info "Component Selection"
+    echo "==============================================="
+    echo "Choose which CrowdStrike components to install:"
+    echo
+
+    # Sensor selection
+    read -p "Install Falcon Sensor (Node Protection)? [Y/n]: " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        INSTALL_SENSOR="false"
+        log_warning "Falcon Sensor will NOT be installed"
+    else
+        log_success "Falcon Sensor will be installed"
+    fi
+
+    # KAC selection
+    read -p "Install Falcon KAC (Kubernetes Admission Controller)? [Y/n]: " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        INSTALL_KAC="false"
+        log_warning "Falcon KAC will NOT be installed"
+    else
+        log_success "Falcon KAC will be installed"
+    fi
+
+    # IAR selection
+    read -p "Install Falcon Image Analyzer (Container Scanning)? [Y/n]: " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        INSTALL_IAR="false"
+        log_warning "Falcon Image Analyzer will NOT be installed"
+    else
+        log_success "Falcon Image Analyzer will be installed"
+    fi
+
+    # GKE Autopilot detection
+    echo
+    read -p "Is this a GKE Autopilot cluster? [y/N]: " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        IS_GKE_AUTOPILOT="true"
+        log_success "GKE Autopilot mode enabled"
+    fi
+
+    # Validate at least one component is selected
+    if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" ]]; then
+        log_error "At least one component must be selected"
+        exit 1
+    fi
+
+    echo
 }
 
 # Validate required environment variables
@@ -162,7 +223,7 @@ get_falcon_configuration() {
     export ENCODED_DOCKER_CONFIG
     log_success "Retrieved Docker registry credentials"
 
-    # Step 3: Get Falcon Sensor image configuration
+    # Step 3: Get Falcon Sensor image configuration (always fetch for potential use)
     log_info "Getting Falcon Sensor image information..."
     if ! FALCON_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon Sensor image path"
@@ -172,7 +233,7 @@ get_falcon_configuration() {
     export SENSOR_IMAGE_TAG=$(echo $FALCON_IMAGE_FULL_PATH | cut -d':' -f 2)
     log_success "Retrieved Falcon Sensor image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
 
-    # Step 4: Get Falcon KAC image configuration
+    # Step 4: Get Falcon KAC image configuration (always fetch for potential use)
     log_info "Getting Falcon KAC image information..."
     if ! FALCON_KAC_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-kac --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon KAC image path"
@@ -182,7 +243,7 @@ get_falcon_configuration() {
     export KAC_IMAGE_TAG=$(echo $FALCON_KAC_IMAGE_FULL_PATH | cut -d':' -f 2)
     log_success "Retrieved Falcon KAC image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
 
-    # Step 5: Get Falcon Image Analyzer configuration
+    # Step 5: Get Falcon Image Analyzer configuration (always fetch for potential use)
     log_info "Getting Falcon Image Analyzer information..."
     if ! FALCON_IAR_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-imageanalyzer --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon Image Analyzer image path"
@@ -201,16 +262,34 @@ show_configuration() {
     echo "FALCON_CID: $FALCON_CID"
     echo "ENCODED_DOCKER_CONFIG: ${ENCODED_DOCKER_CONFIG:0:50}..." # Show only first 50 chars
     echo ""
-    echo "Falcon Sensor:"
-    echo "  - Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
+
+    echo "Selected Components:"
+    if [[ "$INSTALL_SENSOR" == "true" ]]; then
+        echo "  ✅ Falcon Sensor - Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
+    else
+        echo "  ❌ Falcon Sensor (disabled)"
+    fi
+
+    if [[ "$INSTALL_KAC" == "true" ]]; then
+        echo "  ✅ Falcon KAC - Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
+    else
+        echo "  ❌ Falcon KAC (disabled)"
+    fi
+
+    if [[ "$INSTALL_IAR" == "true" ]]; then
+        echo "  ✅ Falcon Image Analyzer - Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
+    else
+        echo "  ❌ Falcon Image Analyzer (disabled)"
+    fi
+
     echo ""
-    echo "Falcon KAC:"
-    echo "  - Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
-    echo ""
-    echo "Falcon Image Analyzer:"
-    echo "  - Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
-    echo ""
-    echo "Cluster Name: $CLUSTERNAME"
+    echo "Cluster Configuration:"
+    echo "  - Name: $CLUSTERNAME"
+    if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
+        echo "  - Type: GKE Autopilot ⚙️"
+    else
+        echo "  - Type: Standard Kubernetes"
+    fi
     echo "=========================================="
 }
 
@@ -226,27 +305,107 @@ add_helm_repo() {
     log_success "Helm repository added and updated"
 }
 
+# Configure GKE Autopilot if needed
+configure_gke_autopilot() {
+    if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
+        log_info "Configuring GKE Autopilot AllowlistSynchronizer..."
+
+        # Create AllowlistSynchronizer YAML
+        cat > allowlist-synchronizer.yaml << EOF
+apiVersion: auto.gke.io/v1
+kind: AllowlistSynchronizer
+metadata:
+  name: crowdstrike-synchronizer
+spec:
+  allowlistPaths:
+  - CrowdStrike/falcon-sensor/*
+EOF
+
+        # Apply AllowlistSynchronizer
+        if kubectl apply -f allowlist-synchronizer.yaml; then
+            log_success "AllowlistSynchronizer created successfully"
+
+            # Wait for it to be ready
+            log_info "Waiting for AllowlistSynchronizer to be ready..."
+            sleep 5
+
+            # Verify AllowlistSynchronizer
+            if kubectl get allowlistsynchronizers crowdstrike-synchronizer &>/dev/null; then
+                log_success "AllowlistSynchronizer is running"
+
+                # Check WorkloadAllowlists
+                if kubectl get workloadallowlists &>/dev/null; then
+                    log_success "WorkloadAllowlists have been fetched"
+                else
+                    log_warning "WorkloadAllowlists may still be loading"
+                fi
+            else
+                log_error "AllowlistSynchronizer failed to start"
+                exit 1
+            fi
+        else
+            log_error "Failed to create AllowlistSynchronizer"
+            exit 1
+        fi
+
+        # Clean up temp file
+        rm -f allowlist-synchronizer.yaml
+    fi
+}
+
 # Deploy Falcon Platform
 deploy_falcon() {
     log_info "Deploying Falcon Platform..."
 
-    # Create the deployment command
-    if helm install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
+    # Build base Helm command
+    local helm_cmd="helm install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
         --namespace falcon-platform \
         --create-namespace \
         --set createComponentNamespaces=true \
         --set global.falcon.cid=$FALCON_CID \
-        --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG \
+        --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG"
+
+    # Add Falcon Sensor settings if enabled
+    if [[ "$INSTALL_SENSOR" == "true" ]]; then
+        helm_cmd="$helm_cmd \
+        --set falcon-sensor.enabled=true \
         --set falcon-sensor.node.image.repository=$SENSOR_REGISTRY \
-        --set falcon-sensor.node.image.tag=$SENSOR_IMAGE_TAG \
+        --set falcon-sensor.node.image.tag=$SENSOR_IMAGE_TAG"
+
+        # Add GKE Autopilot settings if needed
+        if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
+            helm_cmd="$helm_cmd \
+            --set falcon-sensor.node.gke.autopilot=true"
+        fi
+    else
+        helm_cmd="$helm_cmd --set falcon-sensor.enabled=false"
+    fi
+
+    # Add Falcon KAC settings if enabled
+    if [[ "$INSTALL_KAC" == "true" ]]; then
+        helm_cmd="$helm_cmd \
+        --set falcon-kac.enabled=true \
         --set falcon-kac.image.repository=$KAC_REGISTRY \
-        --set falcon-kac.image.tag=$KAC_IMAGE_TAG \
+        --set falcon-kac.image.tag=$KAC_IMAGE_TAG"
+    else
+        helm_cmd="$helm_cmd --set falcon-kac.enabled=false"
+    fi
+
+    # Add Falcon Image Analyzer settings if enabled
+    if [[ "$INSTALL_IAR" == "true" ]]; then
+        helm_cmd="$helm_cmd \
         --set falcon-image-analyzer.deployment.enabled=true \
         --set falcon-image-analyzer.image.repository=$IAR_REGISTRY \
         --set falcon-image-analyzer.image.tag=$IAR_IMAGE_TAG \
         --set falcon-image-analyzer.crowdstrikeConfig.clusterName=$CLUSTERNAME \
         --set falcon-image-analyzer.crowdstrikeConfig.clientID=$FALCON_CLIENT_ID \
-        --set falcon-image-analyzer.crowdstrikeConfig.clientSecret=$FALCON_CLIENT_SECRET; then
+        --set falcon-image-analyzer.crowdstrikeConfig.clientSecret=$FALCON_CLIENT_SECRET"
+    else
+        helm_cmd="$helm_cmd --set falcon-image-analyzer.deployment.enabled=false"
+    fi
+
+    # Execute the deployment command
+    if eval $helm_cmd; then
         log_success "Falcon Platform deployed successfully!"
     else
         log_error "Failed to deploy Falcon Platform"
@@ -286,9 +445,20 @@ print_success() {
     log_success "🎉 CrowdStrike Falcon Platform has been successfully deployed!"
     echo
     echo "Components deployed:"
-    echo "  ✅ Falcon Sensor (Node protection)"
-    echo "  ✅ Falcon Kubernetes Admission Controller (Policy enforcement)"
-    echo "  ✅ Falcon Image Analyzer (Container image scanning)"
+    if [[ "$INSTALL_SENSOR" == "true" ]]; then
+        echo "  ✅ Falcon Sensor (Node protection)"
+    fi
+    if [[ "$INSTALL_KAC" == "true" ]]; then
+        echo "  ✅ Falcon Kubernetes Admission Controller (Policy enforcement)"
+    fi
+    if [[ "$INSTALL_IAR" == "true" ]]; then
+        echo "  ✅ Falcon Image Analyzer (Container image scanning)"
+    fi
+
+    if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
+        echo "  ⚙️  GKE Autopilot AllowlistSynchronizer configured"
+    fi
+
     echo
     echo "Next steps:"
     echo "  1. Monitor the deployment: kubectl get pods -A | grep falcon"
@@ -312,12 +482,14 @@ main() {
     trap cleanup EXIT
 
     check_root
+    select_components
     validate_environment
     check_prerequisites
     download_falcon_script
     get_falcon_configuration
     show_configuration
     add_helm_repo
+    configure_gke_autopilot
     deploy_falcon
     verify_deployment
     print_success
