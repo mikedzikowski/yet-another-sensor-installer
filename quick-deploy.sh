@@ -461,6 +461,7 @@ deploy_falcon() {
     else
         helm_cmd="$helm_cmd \
         --set falcon-image-analyzer.deployment.enabled=false \
+        --set falcon-image-analyzer.daemonset.enabled=false \
         --set falcon-image-analyzer.crowdstrikeConfig.clusterName=$CLUSTERNAME \
         --set falcon-image-analyzer.crowdstrikeConfig.clientID=$FALCON_CLIENT_ID \
         --set falcon-image-analyzer.crowdstrikeConfig.clientSecret=$FALCON_CLIENT_SECRET"
