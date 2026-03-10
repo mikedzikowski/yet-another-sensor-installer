@@ -38,6 +38,24 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Progress indicator function
+show_progress() {
+    local message="$1"
+    local duration=${2:-30}
+    local interval=2
+    local elapsed=0
+
+    echo -ne "${BLUE}[INFO]${NC} $message"
+
+    while [[ $elapsed -lt $duration ]]; do
+        echo -ne "."
+        sleep $interval
+        elapsed=$((elapsed + interval))
+    done
+
+    echo " ✓"
+}
+
 echo "🛡️  CrowdStrike Falcon Simple Deployment"
 echo "========================================"
 echo
@@ -447,7 +465,7 @@ deploy_falcon() {
         helm_cmd="$helm_cmd --set falcon-image-analyzer.deployment.enabled=false"
     fi
 
-    # Execute the deployment command with conditional verbosity
+    # Execute the deployment command with conditional verbosity and progress indication
     if [[ "$VERBOSE" == "true" ]]; then
         if eval $helm_cmd; then
             log_success "Falcon Platform deployed successfully!"
@@ -456,9 +474,34 @@ deploy_falcon() {
             exit 1
         fi
     else
-        if eval $helm_cmd >/dev/null 2>&1; then
+        # Run deployment in background and show progress
+        eval $helm_cmd >/dev/null 2>&1 &
+        local deploy_pid=$!
+
+        # Show progress while deployment is running
+        echo -ne "${BLUE}[INFO]${NC} Deployment in progress"
+        local dots=0
+        while kill -0 $deploy_pid 2>/dev/null; do
+            echo -ne "."
+            sleep 2
+            dots=$((dots + 1))
+            # Show encouraging messages every 10 dots (20 seconds)
+            if [[ $((dots % 10)) -eq 0 ]]; then
+                case $((dots / 10)) in
+                    1) echo -ne " [Creating namespaces]" ;;
+                    2) echo -ne " [Pulling container images]" ;;
+                    3) echo -ne " [Starting pods]" ;;
+                    *) echo -ne " [Finalizing deployment]" ;;
+                esac
+            fi
+        done
+
+        # Check deployment result
+        if wait $deploy_pid; then
+            echo " ✓"
             log_success "Falcon Platform deployed successfully!"
         else
+            echo " ✗"
             log_error "Failed to deploy Falcon Platform"
             log_info "Re-running deployment with verbose output for troubleshooting..."
             eval $helm_cmd
@@ -471,9 +514,17 @@ deploy_falcon() {
 verify_deployment() {
     log_info "Verifying deployment..."
 
-    # Wait for pods to be ready
-    log_info "Waiting for pods to be ready (this may take several minutes)..."
-    sleep 10
+    # Wait for pods to be ready with progress indicator
+    echo -ne "${BLUE}[INFO]${NC} Waiting for pods to start"
+    for i in {1..15}; do
+        echo -ne "."
+        sleep 2
+        # Check if any pods are running yet
+        if kubectl get pods -A --no-headers 2>/dev/null | grep -q falcon; then
+            break
+        fi
+    done
+    echo " ✓"
 
     # Show deployment status
     echo
@@ -481,7 +532,11 @@ verify_deployment() {
     echo "==================="
 
     # Show helm release
-    helm list -n falcon-platform
+    if [[ "$VERBOSE" == "true" ]]; then
+        helm list -n falcon-platform
+    else
+        helm list -n falcon-platform --short
+    fi
     echo
 
     # Show running containers organized by namespace
@@ -495,7 +550,11 @@ verify_deployment() {
         if kubectl get pods -n falcon-platform --no-headers 2>/dev/null | wc -l | grep -q "0"; then
             echo "  No pods in this namespace"
         else
-            kubectl get pods -n falcon-platform -o wide 2>/dev/null | sed 's/^/  /'
+            if [[ "$VERBOSE" == "true" ]]; then
+                kubectl get pods -n falcon-platform -o wide 2>/dev/null | sed 's/^/  /'
+            else
+                kubectl get pods -n falcon-platform 2>/dev/null | sed 's/^/  /'
+            fi
         fi
     fi
 
@@ -506,7 +565,11 @@ verify_deployment() {
         if kubectl get pods -n falcon-system --no-headers 2>/dev/null | wc -l | grep -q "0"; then
             echo "  No pods in this namespace"
         else
-            kubectl get pods -n falcon-system -o wide 2>/dev/null | sed 's/^/  /'
+            if [[ "$VERBOSE" == "true" ]]; then
+                kubectl get pods -n falcon-system -o wide 2>/dev/null | sed 's/^/  /'
+            else
+                kubectl get pods -n falcon-system 2>/dev/null | sed 's/^/  /'
+            fi
         fi
     fi
 
@@ -517,7 +580,11 @@ verify_deployment() {
         if kubectl get pods -n falcon-kac --no-headers 2>/dev/null | wc -l | grep -q "0"; then
             echo "  No pods in this namespace"
         else
-            kubectl get pods -n falcon-kac -o wide 2>/dev/null | sed 's/^/  /'
+            if [[ "$VERBOSE" == "true" ]]; then
+                kubectl get pods -n falcon-kac -o wide 2>/dev/null | sed 's/^/  /'
+            else
+                kubectl get pods -n falcon-kac 2>/dev/null | sed 's/^/  /'
+            fi
         fi
     fi
 
@@ -528,7 +595,11 @@ verify_deployment() {
         if kubectl get pods -n falcon-image-analyzer --no-headers 2>/dev/null | wc -l | grep -q "0"; then
             echo "  No pods in this namespace"
         else
-            kubectl get pods -n falcon-image-analyzer -o wide 2>/dev/null | sed 's/^/  /'
+            if [[ "$VERBOSE" == "true" ]]; then
+                kubectl get pods -n falcon-image-analyzer -o wide 2>/dev/null | sed 's/^/  /'
+            else
+                kubectl get pods -n falcon-image-analyzer 2>/dev/null | sed 's/^/  /'
+            fi
         fi
     fi
 
