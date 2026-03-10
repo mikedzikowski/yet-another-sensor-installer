@@ -62,6 +62,17 @@ export CLUSTERNAME="your-cluster-name"                       # Any descriptive n
 
 ### One-Command Deployment
 
+#### Method 1: Interactive Prompts (Recommended)
+```bash
+export FALCON_CLIENT_ID="your-client-id" && \
+export FALCON_CLIENT_SECRET="your-client-secret" && \
+export CLUSTERNAME="your-cluster-name" && \
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh && \
+chmod +x quick-deploy.sh && \
+./quick-deploy.sh
+```
+
+#### Method 2: Piped with Defaults (All Components)
 ```bash
 export FALCON_CLIENT_ID="your-client-id" && \
 export FALCON_CLIENT_SECRET="your-client-secret" && \
@@ -69,7 +80,19 @@ export CLUSTERNAME="your-cluster-name" && \
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
-> **Note**: Replace the placeholder values above with your actual credentials.
+#### Method 3: Piped with Custom Component Selection
+```bash
+export FALCON_CLIENT_ID="your-client-id" && \
+export FALCON_CLIENT_SECRET="your-client-secret" && \
+export CLUSTERNAME="your-cluster-name" && \
+export INSTALL_SENSOR=true && \
+export INSTALL_KAC=false && \
+export INSTALL_IAR=true && \
+export IS_GKE_AUTOPILOT=false && \
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+```
+
+> **⚠️ Note**: Interactive prompts only work with Method 1 (downloaded script). Methods 2 & 3 use environment variables for component selection.
 
 That's it! ✨
 
