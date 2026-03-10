@@ -514,11 +514,11 @@ deploy_falcon() {
 verify_deployment() {
     log_info "Verifying deployment..."
 
-    # Wait for pods to be ready with progress indicator
+    # Wait for pods to be ready with progress indicator (10 seconds total)
     echo -ne "${BLUE}[INFO]${NC} Waiting for pods to start"
-    for i in {1..5}; do
-        echo -ne ".."
-        sleep 2
+    for i in {1..10}; do
+        echo -ne "."
+        sleep 1
     done
     echo " ✓"
 
