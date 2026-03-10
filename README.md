@@ -164,30 +164,232 @@ falcon-kac              falcon-kac-xxx-xxx                           3/3     Run
 falcon-system           falcon-platform-falcon-sensor-xxx            1/1     Running   0          2m
 ```
 
-## 🗑️ Uninstall
+## 🗑️ Cleanup & Uninstallation
 
-To completely remove Falcon Platform:
+### Complete Cleanup
 
+To completely remove CrowdStrike Falcon Platform and all associated resources:
+
+#### Method 1: Single Command Cleanup
 ```bash
-# Download the uninstall script
-curl -O https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/uninstall-falcon.sh
-chmod +x uninstall-falcon.sh
-
-# Run uninstall
-./uninstall-falcon.sh
+helm uninstall falcon-platform -n falcon-platform && \
+kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer --ignore-not-found && \
+kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=falcon-platform --ignore-not-found
 ```
 
-Or manually:
-
+#### Method 2: Step-by-Step Cleanup
 ```bash
-# Remove Helm release
+# 1. Remove the Helm release
 helm uninstall falcon-platform -n falcon-platform
 
-# Remove namespaces
-kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer
+# 2. Delete all CrowdStrike namespaces
+kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer --ignore-not-found
+
+# 3. Clean up ValidatingWebhookConfigurations
+kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=falcon-platform --ignore-not-found
+
+# 4. (GKE Autopilot only) Remove AllowlistSynchronizer if present
+kubectl delete allowlistsynchronizers crowdstrike-synchronizer --ignore-not-found
 ```
 
-## 🔧 Troubleshooting
+### Verification of Cleanup
+
+Verify complete removal:
+
+```bash
+# Check no Helm releases remain
+helm list -A | grep falcon
+
+# Check no namespaces remain
+kubectl get namespaces | grep falcon
+
+# Check no pods remain
+kubectl get pods -A | grep falcon
+
+# Check no ValidatingWebhookConfigurations remain
+kubectl get validatingwebhookconfigurations | grep crowdstrike
+
+# (GKE Autopilot only) Check no AllowlistSynchronizers remain
+kubectl get allowlistsynchronizers | grep crowdstrike
+```
+
+### Selective Component Removal
+
+If you used component selection during deployment, you can remove specific components:
+
+#### Remove Only Falcon Sensor
+```bash
+kubectl delete daemonset -n falcon-system falcon-platform-falcon-sensor
+kubectl delete namespace falcon-system --ignore-not-found
+```
+
+#### Remove Only Falcon KAC
+```bash
+kubectl delete deployment -n falcon-kac falcon-kac
+kubectl delete validatingwebhookconfigurations validating.falcon-kac.crowdstrike.com --ignore-not-found
+kubectl delete namespace falcon-kac --ignore-not-found
+```
+
+#### Remove Only Falcon Image Analyzer
+```bash
+kubectl delete deployment -n falcon-image-analyzer falcon-platform-falcon-image-analyzer
+kubectl delete namespace falcon-image-analyzer --ignore-not-found
+```
+
+> **⚠️ Important**: Always perform complete cleanup in test environments to ensure clean slate for re-deployment testing.
+
+## 🧪 Testing the Enhanced Deployment Script
+
+### Prerequisites for Testing
+
+1. **Clean Kubernetes cluster** (or cleaned up existing deployment using instructions above)
+2. **Valid CrowdStrike OAuth credentials** with required permissions
+3. **kubectl** and **helm** configured and working
+4. **Internet access** from cluster to CrowdStrike registry
+
+### Test Scenarios
+
+The enhanced script now supports component selection and GKE Autopilot. Test the following scenarios:
+
+#### Test 1: All Components (Default Behavior)
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="test-all-components"
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+```
+**User Responses**: Y, Y, Y, N (Sensor=Yes, KAC=Yes, IAR=Yes, GKE=No)
+
+**Expected Results**:
+- ✅ Falcon Sensor DaemonSet in `falcon-system` namespace
+- ✅ Falcon KAC Deployment in `falcon-kac` namespace
+- ✅ Falcon Image Analyzer Deployment in `falcon-image-analyzer` namespace
+
+#### Test 2: Sensor Only
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="test-sensor-only"
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+```
+**User Responses**: Y, N, N, N (Sensor=Yes, KAC=No, IAR=No, GKE=No)
+
+**Expected Results**:
+- ✅ Only Falcon Sensor deployed
+- ❌ No KAC or IAR components
+- Only `falcon-system` namespace created
+
+#### Test 3: KAC + IAR (No Sensor)
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="test-kac-iar"
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+```
+**User Responses**: N, Y, Y, N (Sensor=No, KAC=Yes, IAR=Yes, GKE=No)
+
+**Expected Results**:
+- ❌ No Sensor DaemonSet
+- ✅ Falcon KAC and IAR deployed
+- `falcon-kac` and `falcon-image-analyzer` namespaces created
+
+#### Test 4: GKE Autopilot Simulation
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="test-gke-autopilot"
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+```
+**User Responses**: Y, Y, Y, Y (All components + GKE Autopilot=Yes)
+
+**Expected Results**:
+- ✅ All components deployed with GKE Autopilot configurations
+- ✅ AllowlistSynchronizer created (will show error on non-GKE clusters - this is expected)
+- Helm values include `--set falcon-sensor.node.gke.autopilot=true`
+
+### Testing Commands
+
+#### Pre-Test Cleanup
+```bash
+# Clean slate before each test
+helm uninstall falcon-platform -n falcon-platform --ignore-not-found
+kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer --ignore-not-found
+kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=falcon-platform --ignore-not-found
+kubectl delete allowlistsynchronizers crowdstrike-synchronizer --ignore-not-found
+```
+
+#### Validation Commands
+```bash
+# Check deployment status
+kubectl get pods -A | grep falcon
+
+# Verify Helm release
+helm list -n falcon-platform
+
+# Check namespaces created
+kubectl get namespaces | grep falcon
+
+# Validate component-specific resources
+kubectl get daemonsets -A | grep falcon      # Sensor
+kubectl get deployments -A | grep falcon     # KAC and IAR
+kubectl get validatingwebhookconfigurations | grep crowdstrike  # KAC webhook
+
+# (GKE Autopilot test) Check AllowlistSynchronizer
+kubectl get allowlistsynchronizers crowdstrike-synchronizer
+```
+
+### Expected Script Output
+
+The enhanced script provides visual feedback:
+
+```
+🛡️  CrowdStrike Falcon Simple Deployment
+========================================
+
+[INFO] Component Selection
+===============================================
+Choose which CrowdStrike components to install:
+
+Install Falcon Sensor (Node Protection)? [Y/n]: Y
+[SUCCESS] Falcon Sensor will be installed
+
+Install Falcon KAC (Kubernetes Admission Controller)? [Y/n]: Y
+[SUCCESS] Falcon KAC will be installed
+
+Install Falcon Image Analyzer (Container Scanning)? [Y/n]: N
+[WARNING] Falcon Image Analyzer will NOT be installed
+
+Is this a GKE Autopilot cluster? [y/N]: N
+
+[INFO] Configuration Summary:
+==========================================
+Selected Components:
+  ✅ Falcon Sensor - Image: registry.crowdstrike.com/falcon-sensor/release/falcon-sensor:x.x.x
+  ✅ Falcon KAC - Image: registry.crowdstrike.com/falcon-kac/release/falcon-kac:x.x.x
+  ❌ Falcon Image Analyzer (disabled)
+
+Cluster Configuration:
+  - Name: your-cluster-name
+  - Type: Standard Kubernetes
+==========================================
+```
+
+### Troubleshooting Test Issues
+
+#### Component Selection Not Working
+- Ensure you're using the latest script from the repository
+- Check that interactive prompts are supported in your environment
+
+#### GKE Autopilot Test Failures (Non-GKE)
+- AllowlistSynchronizer creation will fail on non-GKE clusters (expected)
+- The script should continue and deploy other components successfully
+
+#### Validation Failures
+- Wait 1-2 minutes for pods to fully start
+- Check logs: `kubectl logs -n <namespace> <pod-name>`
+- Verify cluster resources are sufficient
+
+> **💡 Tip**: Test each scenario in sequence, cleaning up between tests to ensure accurate validation of component selection logic.
 
 ### Common Issues
 
