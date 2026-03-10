@@ -22,6 +22,9 @@ INSTALL_KAC="true"
 INSTALL_IAR="true"
 IS_GKE_AUTOPILOT="false"
 
+# Verbose mode (can be enabled with VERBOSE=true environment variable)
+VERBOSE=${VERBOSE:-"false"}
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -72,6 +75,7 @@ select_components() {
         log_info "  export INSTALL_KAC=false       # to disable KAC"
         log_info "  export INSTALL_IAR=false       # to disable IAR"
         log_info "  export IS_GKE_AUTOPILOT=true   # to enable GKE Autopilot"
+        log_info "  export VERBOSE=true             # to enable verbose output"
         echo
 
         # Use environment variables or defaults
@@ -249,53 +253,45 @@ get_falcon_configuration() {
     log_info "Retrieving Falcon configuration..."
 
     # Step 1: Get Falcon CID
-    log_info "Getting Falcon Customer ID (CID)..."
     if ! FALCON_CID=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-cid 2>/dev/null); then
         log_error "Failed to retrieve Falcon CID"
         echo "Please verify your FALCON_CLIENT_ID and FALCON_CLIENT_SECRET are correct"
         exit 1
     fi
     export FALCON_CID
-    log_success "Retrieved Falcon CID: ${FALCON_CID:0:8}..."
 
     # Step 2: Get encoded Docker config pull token
-    log_info "Getting Docker registry credentials..."
     if ! ENCODED_DOCKER_CONFIG=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-pull-token 2>/dev/null); then
         log_error "Failed to retrieve Docker registry credentials"
         exit 1
     fi
     export ENCODED_DOCKER_CONFIG
-    log_success "Retrieved Docker registry credentials"
 
     # Step 3: Get Falcon Sensor image configuration (always fetch for potential use)
-    log_info "Getting Falcon Sensor image information..."
     if ! FALCON_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon Sensor image path"
         exit 1
     fi
     export SENSOR_REGISTRY=$(echo $FALCON_IMAGE_FULL_PATH | cut -d':' -f 1)
     export SENSOR_IMAGE_TAG=$(echo $FALCON_IMAGE_FULL_PATH | cut -d':' -f 2)
-    log_success "Retrieved Falcon Sensor image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
 
     # Step 4: Get Falcon KAC image configuration (always fetch for potential use)
-    log_info "Getting Falcon KAC image information..."
     if ! FALCON_KAC_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-kac --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon KAC image path"
         exit 1
     fi
     export KAC_REGISTRY=$(echo $FALCON_KAC_IMAGE_FULL_PATH | cut -d':' -f 1)
     export KAC_IMAGE_TAG=$(echo $FALCON_KAC_IMAGE_FULL_PATH | cut -d':' -f 2)
-    log_success "Retrieved Falcon KAC image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
 
     # Step 5: Get Falcon Image Analyzer configuration (always fetch for potential use)
-    log_info "Getting Falcon Image Analyzer information..."
     if ! FALCON_IAR_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-imageanalyzer --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon Image Analyzer image path"
         exit 1
     fi
     export IAR_REGISTRY=$(echo $FALCON_IAR_IMAGE_FULL_PATH | cut -d':' -f 1)
     export IAR_IMAGE_TAG=$(echo $FALCON_IAR_IMAGE_FULL_PATH | cut -d':' -f 2)
-    log_success "Retrieved Falcon Image Analyzer image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
+
+    log_success "Configuration retrieved successfully"
 }
 
 # Display configuration summary
@@ -341,11 +337,17 @@ show_configuration() {
 add_helm_repo() {
     log_info "Adding CrowdStrike Helm repository..."
 
-    helm repo add crowdstrike https://crowdstrike.github.io/falcon-helm 2>/dev/null || {
-        log_info "Repository already exists, updating..."
-    }
-
-    helm repo update
+    if [[ "$VERBOSE" == "true" ]]; then
+        helm repo add crowdstrike https://crowdstrike.github.io/falcon-helm 2>/dev/null || {
+            log_info "Repository already exists, updating..."
+        }
+        helm repo update
+    else
+        helm repo add crowdstrike https://crowdstrike.github.io/falcon-helm >/dev/null 2>&1 || {
+            log_info "Repository already exists, updating..."
+        }
+        helm repo update >/dev/null 2>&1
+    fi
     log_success "Helm repository added and updated"
 }
 
@@ -366,7 +368,7 @@ spec:
 EOF
 
         # Apply AllowlistSynchronizer
-        if kubectl apply -f allowlist-synchronizer.yaml; then
+        if kubectl apply -f allowlist-synchronizer.yaml >/dev/null 2>&1; then
             log_success "AllowlistSynchronizer created successfully"
 
             # Wait for it to be ready
@@ -374,12 +376,9 @@ EOF
             sleep 5
 
             # Verify AllowlistSynchronizer
-            if kubectl get allowlistsynchronizers crowdstrike-synchronizer &>/dev/null; then
-                log_success "AllowlistSynchronizer is running"
-
-                # Check WorkloadAllowlists
-                if kubectl get workloadallowlists &>/dev/null; then
-                    log_success "WorkloadAllowlists have been fetched"
+            if kubectl get allowlistsynchronizers crowdstrike-synchronizer >/dev/null 2>&1; then
+                if kubectl get workloadallowlists >/dev/null 2>&1; then
+                    log_success "GKE Autopilot configuration complete"
                 else
                     log_warning "WorkloadAllowlists may still be loading"
                 fi
@@ -448,12 +447,23 @@ deploy_falcon() {
         helm_cmd="$helm_cmd --set falcon-image-analyzer.deployment.enabled=false"
     fi
 
-    # Execute the deployment command
-    if eval $helm_cmd; then
-        log_success "Falcon Platform deployed successfully!"
+    # Execute the deployment command with conditional verbosity
+    if [[ "$VERBOSE" == "true" ]]; then
+        if eval $helm_cmd; then
+            log_success "Falcon Platform deployed successfully!"
+        else
+            log_error "Failed to deploy Falcon Platform"
+            exit 1
+        fi
     else
-        log_error "Failed to deploy Falcon Platform"
-        exit 1
+        if eval $helm_cmd >/dev/null 2>&1; then
+            log_success "Falcon Platform deployed successfully!"
+        else
+            log_error "Failed to deploy Falcon Platform"
+            log_info "Re-running deployment with verbose output for troubleshooting..."
+            eval $helm_cmd
+            exit 1
+        fi
     fi
 }
 
