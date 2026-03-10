@@ -16,11 +16,8 @@
 
 set -e
 
-# Component selection variables
-INSTALL_SENSOR="true"
-INSTALL_KAC="true"
-INSTALL_IAR="true"
-IS_GKE_AUTOPILOT="false"
+# Component selection variables (can be overridden by environment variables)
+# These are used as defaults if environment variables are not set
 
 # Verbose mode (can be enabled with VERBOSE=true environment variable)
 VERBOSE=${VERBOSE:-"false"}
@@ -96,11 +93,11 @@ select_components() {
         log_info "  export VERBOSE=true             # to enable verbose output"
         echo
 
-        # Use environment variables or defaults
-        INSTALL_SENSOR=${INSTALL_SENSOR:-"true"}
-        INSTALL_KAC=${INSTALL_KAC:-"true"}
-        INSTALL_IAR=${INSTALL_IAR:-"true"}
-        IS_GKE_AUTOPILOT=${IS_GKE_AUTOPILOT:-"false"}
+        # Read environment variables or use defaults
+        INSTALL_SENSOR="${INSTALL_SENSOR:-true}"
+        INSTALL_KAC="${INSTALL_KAC:-true}"
+        INSTALL_IAR="${INSTALL_IAR:-true}"
+        IS_GKE_AUTOPILOT="${IS_GKE_AUTOPILOT:-false}"
 
         # Log final selections
         log_info "Final component selections:"
