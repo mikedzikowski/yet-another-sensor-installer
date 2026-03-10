@@ -532,107 +532,13 @@ verify_deployment() {
     echo "==================="
 
     # Show helm release
-    if [[ "$VERBOSE" == "true" ]]; then
-        helm list -n falcon-platform
-    else
-        helm list -n falcon-platform --short
-    fi
+    helm list -n falcon-platform
     echo
 
-    # Show running containers organized by namespace
-    echo "CrowdStrike Components by Namespace:"
-    echo "===================================="
+    # Show pods across all falcon namespaces
+    echo "Falcon Pods:"
+    kubectl get pods -A | grep falcon || echo "No falcon pods found yet"
 
-    # Check falcon-platform namespace (main deployment)
-    if kubectl get namespace falcon-platform &>/dev/null; then
-        echo
-        log_info "📦 falcon-platform namespace:"
-        if kubectl get pods -n falcon-platform --no-headers 2>/dev/null | wc -l | grep -q "0"; then
-            echo "  No pods in this namespace"
-        else
-            if [[ "$VERBOSE" == "true" ]]; then
-                kubectl get pods -n falcon-platform -o wide 2>/dev/null | sed 's/^/  /'
-            else
-                kubectl get pods -n falcon-platform 2>/dev/null | sed 's/^/  /'
-            fi
-        fi
-    fi
-
-    # Check falcon-system namespace (Sensor)
-    if [[ "$INSTALL_SENSOR" == "true" ]] && kubectl get namespace falcon-system &>/dev/null; then
-        echo
-        log_info "🛡️  falcon-system namespace (Falcon Sensor):"
-        if kubectl get pods -n falcon-system --no-headers 2>/dev/null | wc -l | grep -q "0"; then
-            echo "  No pods in this namespace"
-        else
-            if [[ "$VERBOSE" == "true" ]]; then
-                kubectl get pods -n falcon-system -o wide 2>/dev/null | sed 's/^/  /'
-            else
-                kubectl get pods -n falcon-system 2>/dev/null | sed 's/^/  /'
-            fi
-        fi
-    fi
-
-    # Check falcon-kac namespace (KAC)
-    if [[ "$INSTALL_KAC" == "true" ]] && kubectl get namespace falcon-kac &>/dev/null; then
-        echo
-        log_info "🔒 falcon-kac namespace (Admission Controller):"
-        if kubectl get pods -n falcon-kac --no-headers 2>/dev/null | wc -l | grep -q "0"; then
-            echo "  No pods in this namespace"
-        else
-            if [[ "$VERBOSE" == "true" ]]; then
-                kubectl get pods -n falcon-kac -o wide 2>/dev/null | sed 's/^/  /'
-            else
-                kubectl get pods -n falcon-kac 2>/dev/null | sed 's/^/  /'
-            fi
-        fi
-    fi
-
-    # Check falcon-image-analyzer namespace (IAR)
-    if [[ "$INSTALL_IAR" == "true" ]] && kubectl get namespace falcon-image-analyzer &>/dev/null; then
-        echo
-        log_info "📊 falcon-image-analyzer namespace (Image Analyzer):"
-        if kubectl get pods -n falcon-image-analyzer --no-headers 2>/dev/null | wc -l | grep -q "0"; then
-            echo "  No pods in this namespace"
-        else
-            if [[ "$VERBOSE" == "true" ]]; then
-                kubectl get pods -n falcon-image-analyzer -o wide 2>/dev/null | sed 's/^/  /'
-            else
-                kubectl get pods -n falcon-image-analyzer 2>/dev/null | sed 's/^/  /'
-            fi
-        fi
-    fi
-
-    echo
-    echo "Summary:"
-    echo "========"
-
-    # Count total pods and ready pods
-    local total_pods=0
-    local ready_pods=0
-
-    for ns in falcon-platform falcon-system falcon-kac falcon-image-analyzer; do
-        if kubectl get namespace "$ns" &>/dev/null; then
-            local ns_total=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | wc -l)
-            local ns_ready=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | grep -c "Running\|Completed" || echo "0")
-            total_pods=$((total_pods + ns_total))
-            ready_pods=$((ready_pods + ns_ready))
-        fi
-    done
-
-    echo "  Total Pods: $total_pods"
-    echo "  Running/Ready Pods: $ready_pods"
-
-    if [[ "$ready_pods" -eq "$total_pods" ]] && [[ "$total_pods" -gt 0 ]]; then
-        log_success "All pods are running! ✅"
-    elif [[ "$total_pods" -gt 0 ]]; then
-        log_warning "Some pods may still be starting... ⏳"
-        log_info "Check individual pod status with: kubectl get pods -n <namespace>"
-    else
-        log_warning "No pods found. This may indicate a deployment issue."
-    fi
-
-    echo
     log_success "Initial verification complete!"
     echo
     log_info "Note: Pods may take several minutes to fully start and become ready"
