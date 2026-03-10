@@ -420,20 +420,34 @@ deploy_falcon() {
         log_info "Existing falcon-platform release found, upgrading..."
         local helm_operation="upgrade"
 
-        # Create component namespaces for upgrade if they don't exist
-        if [[ "$INSTALL_SENSOR" == "true" ]]; then
-            kubectl create namespace falcon-system --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
+        # Detect currently deployed components by checking existing namespaces
+        local existing_sensor=$(kubectl get namespace falcon-system >/dev/null 2>&1 && echo "true" || echo "false")
+        local existing_kac=$(kubectl get namespace falcon-kac >/dev/null 2>&1 && echo "true" || echo "false")
+        local existing_iar=$(kubectl get namespace falcon-image-analyzer >/dev/null 2>&1 && echo "true" || echo "false")
+
+        log_info "Current deployment state:"
+        [[ "$existing_sensor" == "true" ]] && log_info "  - Falcon Sensor: Currently deployed" || log_info "  - Falcon Sensor: Not deployed"
+        [[ "$existing_kac" == "true" ]] && log_info "  - Falcon KAC: Currently deployed" || log_info "  - Falcon KAC: Not deployed"
+        [[ "$existing_iar" == "true" ]] && log_info "  - Falcon IAR: Currently deployed" || log_info "  - Falcon IAR: Not deployed"
+
+        # Create component namespaces for NEW components being enabled
+        if [[ "$INSTALL_SENSOR" == "true" && "$existing_sensor" == "false" ]]; then
+            log_info "Creating falcon-system namespace for new Sensor deployment..."
+            kubectl create namespace falcon-system
         fi
-        if [[ "$INSTALL_KAC" == "true" ]]; then
-            kubectl create namespace falcon-kac --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
+        if [[ "$INSTALL_KAC" == "true" && "$existing_kac" == "false" ]]; then
+            log_info "Creating falcon-kac namespace for new KAC deployment..."
+            kubectl create namespace falcon-kac
         fi
-        if [[ "$INSTALL_IAR" == "true" ]]; then
-            kubectl create namespace falcon-image-analyzer --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
+        if [[ "$INSTALL_IAR" == "true" && "$existing_iar" == "false" ]]; then
+            log_info "Creating falcon-image-analyzer namespace for new IAR deployment..."
+            kubectl create namespace falcon-image-analyzer
         fi
 
-        local helm_cmd="helm upgrade falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
+        # Use helm upgrade with reuse-values (no createComponentNamespaces on upgrades)
+        local helm_cmd="helm upgrade --install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
             --namespace falcon-platform \
-            --set createComponentNamespaces=true \
+            --reuse-values \
             --set global.falcon.cid=$FALCON_CID \
             --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG"
     else
