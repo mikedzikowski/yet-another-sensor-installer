@@ -219,34 +219,13 @@ Kubernetes Cluster
 
 ## 🔧 Advanced Configuration
 
-### Custom Falcon Cloud
-
-If auto-detection doesn't work, you can override the Falcon cloud:
-
-```bash
-export FALCON_CLOUD="api.us-2.crowdstrike.com"  # US-2
-# or
-export FALCON_CLOUD="api.eu-1.crowdstrike.com"  # EU-1
-# or
-export FALCON_CLOUD="api.laggar.gcw.crowdstrike.com"  # Gov
-```
-
-### Debug Mode
+### Verbose Mode
 
 Enable verbose output for troubleshooting:
 
 ```bash
-export DEBUG=true
-./deploy-falcon.sh
-```
-
-### Dry Run
-
-See what would be deployed without actually deploying:
-
-```bash
-export DRY_RUN=true
-./deploy-falcon.sh
+export VERBOSE=true
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
 ## 🔍 Verification
@@ -550,17 +529,30 @@ If you need more control, use the individual Helm charts instead:
 
 ### Custom Values
 
-For advanced configuration, extract the generated values and customize:
+For advanced configuration, customize component deployment:
 
 ```bash
-# Generate values file (requires DRY_RUN=true)
-export DRY_RUN=true
-./deploy-falcon.sh > my-values.yaml
+# Deploy with custom component selection
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="your-cluster-name"
+export INSTALL_SENSOR=true
+export INSTALL_KAC=false      # Disable KAC
+export INSTALL_IAR=true
+export VERBOSE=true           # Enable verbose output
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+```
 
-# Deploy with custom values
-helm install falcon-platform crowdstrike/falcon-platform \
-  -f my-values.yaml \
-  --namespace falcon-platform
+Or deploy individual charts directly:
+
+```bash
+# Example: Deploy only Falcon Sensor
+helm install falcon-sensor crowdstrike/falcon-sensor \
+  --namespace falcon-system \
+  --create-namespace \
+  --set falcon.cid="your-cid" \
+  --set image.repository="registry.crowdstrike.com/falcon-sensor/release/falcon-sensor" \
+  --set image.tag="latest"
 ```
 
 ## 🤝 Support
