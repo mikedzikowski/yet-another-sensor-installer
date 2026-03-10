@@ -117,6 +117,94 @@ The deployment script automatically:
 - 🌐 **Cloud Auto-Detection** - Detects your Falcon cloud (US-1, US-2, EU-1, Gov)
 - 📦 **Latest Images** - Uses the most current Falcon component images
 
+## 📺 Example Deployment Output
+
+Here's what you'll see when running the deployment:
+
+```bash
+$ export FALCON_CLIENT_ID="your-client-id"
+$ export FALCON_CLIENT_SECRET="your-client-secret"
+$ export CLUSTERNAME="my-k8s-cluster"
+$ curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+
+🛡️  CrowdStrike Falcon Simple Deployment
+========================================
+
+[WARNING] Script is running in non-interactive mode.
+[INFO] Detected piped execution. Using environment variables or defaults.
+
+[INFO] Final component selections:
+[SUCCESS] ✅ Falcon Sensor will be installed
+[SUCCESS] ✅ Falcon KAC will be installed
+[SUCCESS] ✅ Falcon Image Analyzer will be installed
+[INFO] Standard Kubernetes mode
+
+[INFO] Validating environment variables...
+[SUCCESS] All required environment variables are set
+[INFO] Using CLUSTERNAME: my-k8s-cluster
+[INFO] Using FALCON_CLIENT_ID: your-cli...
+
+[INFO] Checking prerequisites...
+[SUCCESS] All prerequisites are installed
+[INFO] Downloading CrowdStrike falcon-container-sensor-pull.sh script...
+[SUCCESS] Downloaded and configured falcon-container-sensor-pull.sh
+[INFO] Retrieving Falcon configuration...
+[SUCCESS] Configuration retrieved successfully
+
+[INFO] Configuration Summary:
+==========================================
+FALCON_CID: 01234567ABCDEF1234567890ABCDEF12-34
+ENCODED_DOCKER_CONFIG: eyJhdXRocyI6IHsgInJlZ2lzdHJ5LmNyb3dkc3RyaWtlLmNvbS...
+
+Selected Components:
+  ✅ Falcon Sensor - Image: registry.crowdstrike.com/falcon-sensor/release/falcon-sensor:7.34.0-18708-1
+  ✅ Falcon KAC - Image: registry.crowdstrike.com/falcon-kac/release/falcon-kac:7.35.0-3302
+  ✅ Falcon Image Analyzer - Image: registry.crowdstrike.com/falcon-imageanalyzer/us-1/release/falcon-imageanalyzer:1.0.23
+
+Cluster Configuration:
+  - Name: my-k8s-cluster
+  - Type: Standard Kubernetes
+==========================================
+[INFO] Adding CrowdStrike Helm repository...
+[SUCCESS] Helm repository added and updated
+[INFO] Deploying Falcon Platform...
+[INFO] Deployment in progress.......... [Creating namespaces].......... [Pulling container images].......... ✓
+[SUCCESS] Falcon Platform deployed successfully!
+[INFO] Verifying deployment...
+[INFO] Waiting for pods to start.................... ✓
+
+[INFO] Deployment Status:
+===================
+NAME            NAMESPACE       REVISION        UPDATED                 STATUS          CHART                   APP VERSION
+falcon-platform falcon-platform 1               2026-03-10 20:26:53.226 deployed        falcon-platform-1.2.0
+
+Falcon Pods:
+falcon-image-analyzer   falcon-platform-falcon-image-analyzer-abc123-def45   1/1     Running             0               30s
+falcon-kac              falcon-kac-55694c97f9-xyz89                          3/3     Running             0               30s
+falcon-system           falcon-platform-falcon-sensor-node1                  1/1     Running             0               30s
+falcon-system           falcon-platform-falcon-sensor-node2                  1/1     Running             0               30s
+falcon-system           falcon-platform-falcon-sensor-node3                  1/1     Running             0               30s
+[SUCCESS] Initial verification complete!
+
+[SUCCESS] 🎉 CrowdStrike Falcon Platform has been successfully deployed!
+
+Components deployed:
+  ✅ Falcon Sensor (Node protection)
+  ✅ Falcon Kubernetes Admission Controller (Policy enforcement)
+  ✅ Falcon Image Analyzer (Container image scanning)
+
+Next steps:
+  1. Monitor the deployment: kubectl get pods -A | grep falcon
+  2. Check logs if needed: kubectl logs -n <namespace> <pod-name>
+  3. View in Falcon Console: https://falcon.crowdstrike.com
+```
+
+> **✨ Key Features Shown:**
+> - Progress indicators during deployment ("Deployment in progress...")
+> - Component selection confirmation
+> - Real-time pod status monitoring
+> - Clean, organized output with clear success indicators
+
 ## 🏗️ Architecture
 
 The script deploys components into dedicated namespaces:
