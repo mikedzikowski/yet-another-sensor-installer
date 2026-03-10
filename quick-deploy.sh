@@ -435,6 +435,8 @@ deploy_falcon() {
             helm_cmd="$helm_cmd \
             --set falcon-sensor.node.gke.autopilot=true"
         fi
+    else
+        helm_cmd="$helm_cmd --set falcon-sensor.enabled=false"
     fi
 
     # Add Falcon KAC settings if enabled
@@ -443,6 +445,8 @@ deploy_falcon() {
         --set falcon-kac.enabled=true \
         --set falcon-kac.image.repository=$KAC_REGISTRY \
         --set falcon-kac.image.tag=$KAC_IMAGE_TAG"
+    else
+        helm_cmd="$helm_cmd --set falcon-kac.enabled=false"
     fi
 
     # Add Falcon Image Analyzer settings if enabled
@@ -454,6 +458,8 @@ deploy_falcon() {
         --set falcon-image-analyzer.crowdstrikeConfig.clusterName=$CLUSTERNAME \
         --set falcon-image-analyzer.crowdstrikeConfig.clientID=$FALCON_CLIENT_ID \
         --set falcon-image-analyzer.crowdstrikeConfig.clientSecret=$FALCON_CLIENT_SECRET"
+    else
+        helm_cmd="$helm_cmd --set falcon-image-analyzer.enabled=false"
     fi
 
     # Execute the deployment command with conditional verbosity and progress indication
