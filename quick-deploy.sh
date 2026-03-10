@@ -415,13 +415,25 @@ EOF
 deploy_falcon() {
     log_info "Deploying Falcon Platform..."
 
-    # Build base Helm command
-    local helm_cmd="helm install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
-        --namespace falcon-platform \
-        --create-namespace \
-        --set createComponentNamespaces=true \
-        --set global.falcon.cid=$FALCON_CID \
-        --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG"
+    # Check if release already exists
+    if helm list -n falcon-platform | grep -q "falcon-platform"; then
+        log_info "Existing falcon-platform release found, upgrading..."
+        local helm_operation="upgrade"
+        local helm_cmd="helm upgrade falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
+            --namespace falcon-platform \
+            --set createComponentNamespaces=true \
+            --set global.falcon.cid=$FALCON_CID \
+            --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG"
+    else
+        log_info "Installing new falcon-platform release..."
+        local helm_operation="install"
+        local helm_cmd="helm install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
+            --namespace falcon-platform \
+            --create-namespace \
+            --set createComponentNamespaces=true \
+            --set global.falcon.cid=$FALCON_CID \
+            --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG"
+    fi
 
     # Add Falcon Sensor settings if enabled
     if [[ "$INSTALL_SENSOR" == "true" ]]; then
@@ -465,7 +477,11 @@ deploy_falcon() {
     # Execute the deployment command with conditional verbosity and progress indication
     if [[ "$VERBOSE" == "true" ]]; then
         if eval $helm_cmd; then
-            log_success "Falcon Platform deployed successfully!"
+            if [[ "$helm_operation" == "upgrade" ]]; then
+                log_success "Falcon Platform upgraded successfully!"
+            else
+                log_success "Falcon Platform deployed successfully!"
+            fi
         else
             log_error "Failed to deploy Falcon Platform"
             exit 1
@@ -496,7 +512,11 @@ deploy_falcon() {
         # Check deployment result
         if wait $deploy_pid; then
             echo " ✓"
-            log_success "Falcon Platform deployed successfully!"
+            if [[ "$helm_operation" == "upgrade" ]]; then
+                log_success "Falcon Platform upgraded successfully!"
+            else
+                log_success "Falcon Platform deployed successfully!"
+            fi
         else
             echo " ✗"
             log_error "Failed to deploy Falcon Platform"
