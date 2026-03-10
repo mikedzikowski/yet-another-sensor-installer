@@ -516,13 +516,9 @@ verify_deployment() {
 
     # Wait for pods to be ready with progress indicator
     echo -ne "${BLUE}[INFO]${NC} Waiting for pods to start"
-    for i in {1..15}; do
-        echo -ne "."
+    for i in {1..5}; do
+        echo -ne ".."
         sleep 2
-        # Check if any pods are running yet
-        if kubectl get pods -A --no-headers 2>/dev/null | grep -q falcon; then
-            break
-        fi
     done
     echo " ✓"
 
