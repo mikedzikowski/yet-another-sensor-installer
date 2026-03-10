@@ -53,15 +53,21 @@ check_root() {
 
 # Interactive component selection
 select_components() {
-    # Check if running in a pipe (no TTY)
-    if [[ ! -t 0 ]]; then
-        log_warning "Script is running in a pipe. Using default component selection."
-        log_info "To use interactive prompts, download and run the script directly:"
-        log_info "  curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh"
-        log_info "  chmod +x quick-deploy.sh && ./quick-deploy.sh"
+    # Check if running in a pipe (no TTY) or if environment variables are already set
+    if [[ ! -t 0 ]] || [[ -n "$INSTALL_SENSOR" ]] || [[ -n "$INSTALL_KAC" ]] || [[ -n "$INSTALL_IAR" ]] || [[ -n "$IS_GKE_AUTOPILOT" ]]; then
+        log_warning "Script is running in non-interactive mode."
+
+        if [[ ! -t 0 ]]; then
+            log_info "Detected piped execution. Using environment variables or defaults."
+            log_info "To use interactive prompts, download and run the script directly:"
+            log_info "  curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh"
+            log_info "  chmod +x quick-deploy.sh && ./quick-deploy.sh"
+        else
+            log_info "Environment variables detected. Using provided values."
+        fi
+
         echo
-        log_info "Using defaults: Sensor=true, KAC=true, IAR=true, GKE Autopilot=false"
-        log_info "To customize, set these environment variables before running:"
+        log_info "Available customization options:"
         log_info "  export INSTALL_SENSOR=false    # to disable Sensor"
         log_info "  export INSTALL_KAC=false       # to disable KAC"
         log_info "  export INSTALL_IAR=false       # to disable IAR"
@@ -81,6 +87,13 @@ select_components() {
         [[ "$INSTALL_IAR" == "true" ]] && log_success "✅ Falcon Image Analyzer will be installed" || log_warning "❌ Falcon Image Analyzer disabled"
         [[ "$IS_GKE_AUTOPILOT" == "true" ]] && log_success "⚙️  GKE Autopilot mode enabled" || log_info "Standard Kubernetes mode"
         echo
+
+        # Validate at least one component is selected
+        if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" ]]; then
+            log_error "At least one component must be selected"
+            exit 1
+        fi
+
         return
     fi
 
