@@ -419,6 +419,18 @@ deploy_falcon() {
     if helm list -n falcon-platform | grep -q "falcon-platform"; then
         log_info "Existing falcon-platform release found, upgrading..."
         local helm_operation="upgrade"
+
+        # Create component namespaces for upgrade if they don't exist
+        if [[ "$INSTALL_SENSOR" == "true" ]]; then
+            kubectl create namespace falcon-system --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
+        fi
+        if [[ "$INSTALL_KAC" == "true" ]]; then
+            kubectl create namespace falcon-kac --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
+        fi
+        if [[ "$INSTALL_IAR" == "true" ]]; then
+            kubectl create namespace falcon-image-analyzer --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
+        fi
+
         local helm_cmd="helm upgrade falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
             --namespace falcon-platform \
             --set createComponentNamespaces=true \
