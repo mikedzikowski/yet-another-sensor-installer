@@ -128,6 +128,7 @@ select_components() {
         INSTALL_SENSOR="false"
         log_warning "Falcon Sensor will NOT be installed"
     else
+        INSTALL_SENSOR="true"
         log_success "Falcon Sensor will be installed"
     fi
 
@@ -138,6 +139,7 @@ select_components() {
         INSTALL_KAC="false"
         log_warning "Falcon KAC will NOT be installed"
     else
+        INSTALL_KAC="true"
         log_success "Falcon KAC will be installed"
     fi
 
@@ -148,6 +150,7 @@ select_components() {
         INSTALL_IAR="false"
         log_warning "Falcon Image Analyzer will NOT be installed"
     else
+        INSTALL_IAR="true"
         log_success "Falcon Image Analyzer will be installed"
     fi
 
@@ -158,6 +161,8 @@ select_components() {
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         IS_GKE_AUTOPILOT="true"
         log_success "GKE Autopilot mode enabled"
+    else
+        IS_GKE_AUTOPILOT="false"
     fi
 
     # Validate at least one component is selected
