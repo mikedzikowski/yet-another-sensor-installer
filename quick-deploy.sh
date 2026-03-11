@@ -95,14 +95,6 @@ check_root() {
 select_components() {
     print_section "COMPONENT CONFIGURATION"
 
-    clean_info "Customization options:"
-    echo "export INSTALL_SENSOR=false    # disable Sensor"
-    echo "export INSTALL_KAC=false       # disable KAC"
-    echo "export INSTALL_IAR=false       # disable IAR"
-    echo "export IS_GKE_AUTOPILOT=true   # enable GKE Autopilot"
-    echo "export VERBOSE=true             # enable verbose output"
-    echo
-
     # Read environment variables or use defaults
     INSTALL_SENSOR="${INSTALL_SENSOR:-true}"
     INSTALL_KAC="${INSTALL_KAC:-true}"
