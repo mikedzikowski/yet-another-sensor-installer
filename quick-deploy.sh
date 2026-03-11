@@ -69,109 +69,37 @@ check_root() {
     fi
 }
 
-# Interactive component selection
+# Component selection using environment variables
 select_components() {
-    # Check if running in a pipe (no TTY) or if environment variables are already set
-    if [[ ! -t 0 ]] || [[ -n "$INSTALL_SENSOR" ]] || [[ -n "$INSTALL_KAC" ]] || [[ -n "$INSTALL_IAR" ]] || [[ -n "$IS_GKE_AUTOPILOT" ]]; then
-        log_warning "Script is running in non-interactive mode."
+    log_info "Configuring CrowdStrike components..."
 
-        if [[ ! -t 0 ]]; then
-            log_info "Detected piped execution. Using environment variables or defaults."
-            log_info "To use interactive prompts, download and run the script directly:"
-            log_info "  curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh"
-            log_info "  chmod +x quick-deploy.sh && ./quick-deploy.sh"
-        else
-            log_info "Environment variables detected. Using provided values."
-        fi
-
-        echo
-        log_info "Available customization options:"
-        log_info "  export INSTALL_SENSOR=false    # to disable Sensor"
-        log_info "  export INSTALL_KAC=false       # to disable KAC"
-        log_info "  export INSTALL_IAR=false       # to disable IAR"
-        log_info "  export IS_GKE_AUTOPILOT=true   # to enable GKE Autopilot"
-        log_info "  export VERBOSE=true             # to enable verbose output"
-        echo
-
-        # Read environment variables or use defaults
-        INSTALL_SENSOR="${INSTALL_SENSOR:-true}"
-        INSTALL_KAC="${INSTALL_KAC:-true}"
-        INSTALL_IAR="${INSTALL_IAR:-true}"
-        IS_GKE_AUTOPILOT="${IS_GKE_AUTOPILOT:-false}"
-
-        # Log final selections
-        log_info "Final component selections:"
-        [[ "$INSTALL_SENSOR" == "true" ]] && log_success "✅ Falcon Sensor will be installed" || log_warning "❌ Falcon Sensor disabled"
-        [[ "$INSTALL_KAC" == "true" ]] && log_success "✅ Falcon KAC will be installed" || log_warning "❌ Falcon KAC disabled"
-        [[ "$INSTALL_IAR" == "true" ]] && log_success "✅ Falcon Image Analyzer will be installed" || log_warning "❌ Falcon Image Analyzer disabled"
-        [[ "$IS_GKE_AUTOPILOT" == "true" ]] && log_success "⚙️  GKE Autopilot mode enabled" || log_info "Standard Kubernetes mode"
-        echo
-
-        # Validate at least one component is selected
-        if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" ]]; then
-            log_error "At least one component must be selected"
-            exit 1
-        fi
-
-        return
-    fi
-
-    log_info "Component Selection"
-    echo "==============================================="
-    echo "Choose which CrowdStrike components to install:"
+    log_info "Available customization options:"
+    log_info "  export INSTALL_SENSOR=false    # to disable Sensor"
+    log_info "  export INSTALL_KAC=false       # to disable KAC"
+    log_info "  export INSTALL_IAR=false       # to disable IAR"
+    log_info "  export IS_GKE_AUTOPILOT=true   # to enable GKE Autopilot"
+    log_info "  export VERBOSE=true             # to enable verbose output"
     echo
 
-    # Sensor selection
-    read -p "Install Falcon Sensor (Node Protection)? [Y/n]: " -r
-    echo
-    if [[ $REPLY =~ ^[Nn]$ ]]; then
-        INSTALL_SENSOR="false"
-        log_warning "Falcon Sensor will NOT be installed"
-    else
-        INSTALL_SENSOR="true"
-        log_success "Falcon Sensor will be installed"
-    fi
+    # Read environment variables or use defaults
+    INSTALL_SENSOR="${INSTALL_SENSOR:-true}"
+    INSTALL_KAC="${INSTALL_KAC:-true}"
+    INSTALL_IAR="${INSTALL_IAR:-true}"
+    IS_GKE_AUTOPILOT="${IS_GKE_AUTOPILOT:-false}"
 
-    # KAC selection
-    read -p "Install Falcon KAC (Kubernetes Admission Controller)? [Y/n]: " -r
+    # Log final selections
+    log_info "Component selections:"
+    [[ "$INSTALL_SENSOR" == "true" ]] && log_success "✅ Falcon Sensor will be installed" || log_warning "❌ Falcon Sensor disabled"
+    [[ "$INSTALL_KAC" == "true" ]] && log_success "✅ Falcon KAC will be installed" || log_warning "❌ Falcon KAC disabled"
+    [[ "$INSTALL_IAR" == "true" ]] && log_success "✅ Falcon Image Analyzer will be installed" || log_warning "❌ Falcon Image Analyzer disabled"
+    [[ "$IS_GKE_AUTOPILOT" == "true" ]] && log_success "⚙️  GKE Autopilot mode enabled" || log_info "Standard Kubernetes mode"
     echo
-    if [[ $REPLY =~ ^[Nn]$ ]]; then
-        INSTALL_KAC="false"
-        log_warning "Falcon KAC will NOT be installed"
-    else
-        INSTALL_KAC="true"
-        log_success "Falcon KAC will be installed"
-    fi
-
-    # IAR selection
-    read -p "Install Falcon Image Analyzer (Container Scanning)? [Y/n]: " -r
-    echo
-    if [[ $REPLY =~ ^[Nn]$ ]]; then
-        INSTALL_IAR="false"
-        log_warning "Falcon Image Analyzer will NOT be installed"
-    else
-        INSTALL_IAR="true"
-        log_success "Falcon Image Analyzer will be installed"
-    fi
-
-    # GKE Autopilot detection
-    echo
-    read -p "Is this a GKE Autopilot cluster? [y/N]: " -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        IS_GKE_AUTOPILOT="true"
-        log_success "GKE Autopilot mode enabled"
-    else
-        IS_GKE_AUTOPILOT="false"
-    fi
 
     # Validate at least one component is selected
     if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" ]]; then
         log_error "At least one component must be selected"
         exit 1
     fi
-
-    echo
 }
 
 # Validate required environment variables
