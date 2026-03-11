@@ -444,10 +444,9 @@ deploy_falcon() {
             kubectl create namespace falcon-image-analyzer
         fi
 
-        # Use helm upgrade with reuse-values (no createComponentNamespaces on upgrades)
+        # Use helm upgrade with complete configuration (no reuse-values to avoid conflicts)
         local helm_cmd="helm upgrade --install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
             --namespace falcon-platform \
-            --reuse-values \
             --set global.falcon.cid=$FALCON_CID \
             --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG"
     else
