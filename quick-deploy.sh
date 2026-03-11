@@ -179,9 +179,24 @@ check_prerequisites() {
         exit 1
     fi
 
-    local helm_version=$(helm version --short --client 2>/dev/null | cut -d':' -f2 | cut -d'v' -f2 | cut -d'.' -f1)
-    if [[ "$helm_version" != "3" ]]; then
-        clean_error "Helm 3.x required (found: $(helm version --short --client 2>/dev/null))"
+    # Check helm version (support Helm 3.x and 4.x)
+    local helm_version_output=$(helm version 2>/dev/null | head -n1)
+    local helm_version=""
+
+    # Extract version number from different helm version output formats
+    if [[ "$helm_version_output" =~ Version:\"v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+        local major_version="${BASH_REMATCH[1]}"
+        helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+
+        # Check for supported versions (3.x or 4.x)
+        if [[ "$major_version" != "3" && "$major_version" != "4" ]]; then
+            clean_error "Helm 3.x or 4.x required (found: $helm_version)"
+            echo "Install or upgrade Helm: https://helm.sh/docs/intro/install/"
+            exit 1
+        fi
+    else
+        clean_error "Unable to detect Helm version"
+        echo "Ensure Helm is properly installed: https://helm.sh/docs/intro/install/"
         exit 1
     fi
 
@@ -193,7 +208,7 @@ check_prerequisites() {
 
     clean_success "All prerequisites verified"
     clean_info "✓ kubectl connected to cluster"
-    clean_info "✓ Helm 3.x available"
+    clean_info "✓ Helm $helm_version available"
     clean_info "✓ curl available"
 }
 
