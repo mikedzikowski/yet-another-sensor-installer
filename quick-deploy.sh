@@ -155,6 +155,35 @@ validate_environment() {
     clean_info "Client ID: ${FALCON_CLIENT_ID:0:8}..."
 }
 
+# Auto-install Helm if not found
+install_helm() {
+    clean_info "Helm not found. Installing Helm automatically..."
+
+    # Create local bin directory
+    mkdir -p "$HOME/bin"
+
+    # Download and install Helm
+    local helm_url="https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3"
+    if curl -fsSL "$helm_url" | bash; then
+        # Add to PATH for current session
+        export PATH="$HOME/bin:$PATH"
+
+        # Add to bashrc for future sessions
+        if ! grep -q 'export PATH="$HOME/bin:$PATH"' "$HOME/.bashrc" 2>/dev/null; then
+            echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bashrc"
+        fi
+
+        clean_success "Helm installed successfully"
+        clean_info "Location: $(which helm)"
+        clean_info "Version: $(helm version --short 2>/dev/null || helm version | head -n1)"
+    else
+        clean_error "Failed to install Helm automatically"
+        clean_info "Please install Helm manually:"
+        clean_info "  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
+        exit 1
+    fi
+}
+
 # Check prerequisites
 check_prerequisites() {
     print_section "PREREQUISITES CHECK"
@@ -172,11 +201,9 @@ check_prerequisites() {
         exit 1
     fi
 
-    # Check helm
+    # Check helm (with auto-install)
     if ! command -v helm &> /dev/null; then
-        clean_error "Helm not found"
-        echo "Install: https://helm.sh/docs/intro/install/"
-        exit 1
+        install_helm
     fi
 
     # Check helm version (support Helm 3.x and 4.x with backwards compatibility)
