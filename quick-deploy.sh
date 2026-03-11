@@ -189,9 +189,14 @@ check_prerequisites() {
 
     if [[ -n "$helm_version_output" ]]; then
         # Try to extract version using regex for BuildInfo format
+        # Handle both full versions (v3.18.0) and truncated versions (v3.18)
         if [[ "$helm_version_output" =~ Version:\"v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
             major_version="${BASH_REMATCH[1]}"
             helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+        elif [[ "$helm_version_output" =~ Version:\"v([0-9]+)\.([0-9]+)\" ]]; then
+            # Handle truncated versions like "v3.18"
+            major_version="${BASH_REMATCH[1]}"
+            helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
         fi
     fi
 
@@ -199,10 +204,14 @@ check_prerequisites() {
     if [[ -z "$helm_version" ]]; then
         local legacy_output=$(helm version --short --client 2>/dev/null || echo "")
         if [[ -n "$legacy_output" ]]; then
-            # Legacy format: "v3.12.3+g3a31588" or "Client: v3.12.3+g3a31588"
+            # Legacy format: "v3.12.3+g3a31588" or "Client: v3.12.3+g3a31588" or "v3.18"
             if [[ "$legacy_output" =~ v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
                 major_version="${BASH_REMATCH[1]}"
                 helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+            elif [[ "$legacy_output" =~ v([0-9]+)\.([0-9]+) ]]; then
+                # Handle truncated versions
+                major_version="${BASH_REMATCH[1]}"
+                helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
             fi
         fi
     fi
@@ -210,9 +219,15 @@ check_prerequisites() {
     # Final fallback: Try basic version parsing
     if [[ -z "$helm_version" ]]; then
         local basic_output=$(helm version --short 2>/dev/null || helm version -c 2>/dev/null || echo "")
-        if [[ -n "$basic_output" && "$basic_output" =~ v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
-            major_version="${BASH_REMATCH[1]}"
-            helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+        if [[ -n "$basic_output" ]]; then
+            if [[ "$basic_output" =~ v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+                major_version="${BASH_REMATCH[1]}"
+                helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+            elif [[ "$basic_output" =~ v([0-9]+)\.([0-9]+) ]]; then
+                # Handle truncated versions
+                major_version="${BASH_REMATCH[1]}"
+                helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+            fi
         fi
     fi
 
