@@ -82,7 +82,7 @@ echo
 # Check if running as root (not recommended)
 check_root() {
     if [[ $EUID -eq 0 ]]; then
-        log_warning "Running as root is not recommended for this script"
+        clean_warning "Running as root is not recommended for this script"
         read -p "Do you want to continue? (y/N): " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -96,11 +96,11 @@ select_components() {
     print_section "COMPONENT CONFIGURATION"
 
     clean_info "Customization options:"
-    echo "      export INSTALL_SENSOR=false    # disable Sensor"
-    echo "      export INSTALL_KAC=false       # disable KAC"
-    echo "      export INSTALL_IAR=false       # disable IAR"
-    echo "      export IS_GKE_AUTOPILOT=true   # enable GKE Autopilot"
-    echo "      export VERBOSE=true             # enable verbose output"
+    echo "export INSTALL_SENSOR=false    # disable Sensor"
+    echo "export INSTALL_KAC=false       # disable KAC"
+    echo "export INSTALL_IAR=false       # disable IAR"
+    echo "export IS_GKE_AUTOPILOT=true   # enable GKE Autopilot"
+    echo "export VERBOSE=true             # enable verbose output"
     echo
 
     # Read environment variables or use defaults
@@ -111,18 +111,18 @@ select_components() {
 
     # Log selections with better formatting
     clean_info "Selected components:"
-    [[ "$INSTALL_SENSOR" == "true" ]] && clean_success "      ✅ Falcon Sensor" || clean_warning "      ❌ Falcon Sensor"
-    [[ "$INSTALL_KAC" == "true" ]] && clean_success "      ✅ Falcon KAC" || clean_warning "      ❌ Falcon KAC"
-    [[ "$INSTALL_IAR" == "true" ]] && clean_success "      ✅ Falcon Image Analyzer" || clean_warning "      ❌ Falcon Image Analyzer"
+    [[ "$INSTALL_SENSOR" == "true" ]] && clean_success "✅ Falcon Sensor" || clean_warning "❌ Falcon Sensor"
+    [[ "$INSTALL_KAC" == "true" ]] && clean_success "✅ Falcon KAC" || clean_warning "❌ Falcon KAC"
+    [[ "$INSTALL_IAR" == "true" ]] && clean_success "✅ Falcon Image Analyzer" || clean_warning "❌ Falcon Image Analyzer"
 
     echo
     clean_info "Cluster type:"
-    [[ "$IS_GKE_AUTOPILOT" == "true" ]] && clean_success "      ⚙️  GKE Autopilot" || clean_info "      🖥️  Standard Kubernetes"
+    [[ "$IS_GKE_AUTOPILOT" == "true" ]] && clean_success "⚙️  GKE Autopilot" || clean_info "🖥️  Standard Kubernetes"
 
     # Validate at least one component is selected
     if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" ]]; then
         echo
-        log_error "At least one component must be selected"
+        clean_error "At least one component must be selected"
         exit 1
     fi
 }
@@ -146,21 +146,21 @@ validate_environment() {
     fi
 
     if [[ ${#missing_vars[@]} -gt 0 ]]; then
-        log_error "Missing required variables:"
+        clean_error "Missing required variables:"
         for var in "${missing_vars[@]}"; do
-            echo "      • $var"
+            echo "• $var"
         done
         echo
         echo "Set the required variables:"
-        echo "      export FALCON_CLIENT_ID=\"your-client-id\""
-        echo "      export FALCON_CLIENT_SECRET=\"your-client-secret\""
-        echo "      export CLUSTERNAME=\"your-cluster-name\""
+        echo "export FALCON_CLIENT_ID=\"your-client-id\""
+        echo "export FALCON_CLIENT_SECRET=\"your-client-secret\""
+        echo "export CLUSTERNAME=\"your-cluster-name\""
         exit 1
     fi
 
     clean_success "Environment variables validated"
-    clean_info "      Cluster: $CLUSTERNAME"
-    clean_info "      Client ID: ${FALCON_CLIENT_ID:0:8}..."
+    clean_info "Cluster: $CLUSTERNAME"
+    clean_info "Client ID: ${FALCON_CLIENT_ID:0:8}..."
 }
 
 # Check prerequisites
@@ -169,40 +169,40 @@ check_prerequisites() {
 
     # Check kubectl
     if ! command -v kubectl &> /dev/null; then
-        log_error "kubectl not found"
-        echo "      Install: https://kubernetes.io/docs/tasks/tools/"
+        clean_error "kubectl not found"
+        echo "Install: https://kubernetes.io/docs/tasks/tools/"
         exit 1
     fi
 
     if ! kubectl cluster-info &> /dev/null; then
-        log_error "Cannot connect to Kubernetes cluster"
-        echo "      Configure kubectl to connect to your cluster"
+        clean_error "Cannot connect to Kubernetes cluster"
+        echo "Configure kubectl to connect to your cluster"
         exit 1
     fi
 
     # Check helm
     if ! command -v helm &> /dev/null; then
-        log_error "Helm not found"
-        echo "      Install: https://helm.sh/docs/intro/install/"
+        clean_error "Helm not found"
+        echo "Install: https://helm.sh/docs/intro/install/"
         exit 1
     fi
 
     local helm_version=$(helm version --short --client 2>/dev/null | cut -d':' -f2 | cut -d'v' -f2 | cut -d'.' -f1)
     if [[ "$helm_version" != "3" ]]; then
-        log_error "Helm 3.x required (found: $(helm version --short --client 2>/dev/null))"
+        clean_error "Helm 3.x required (found: $(helm version --short --client 2>/dev/null))"
         exit 1
     fi
 
     # Check curl
     if ! command -v curl &> /dev/null; then
-        log_error "curl not found"
+        clean_error "curl not found"
         exit 1
     fi
 
     clean_success "All prerequisites verified"
-    clean_info "      ✓ kubectl connected to cluster"
-    clean_info "      ✓ Helm 3.x available"
-    clean_info "      ✓ curl available"
+    clean_info "✓ kubectl connected to cluster"
+    clean_info "✓ Helm 3.x available"
+    clean_info "✓ curl available"
 }
 
 # Download CrowdStrike falcon-container-sensor-pull.sh script
@@ -213,7 +213,7 @@ download_falcon_script() {
         chmod +x falcon-container-sensor-pull.sh
         clean_success "Official CrowdStrike script downloaded"
     else
-        log_error "Failed to download falcon-container-sensor-pull.sh"
+        clean_error "Failed to download falcon-container-sensor-pull.sh"
         exit 1
     fi
 }
@@ -224,8 +224,8 @@ get_falcon_configuration() {
 
     if [[ "$VERBOSE" == "true" ]]; then
         clean_info "Retrieving Falcon API configuration..."
-        clean_info "      Using Client ID: ${FALCON_CLIENT_ID:0:8}..."
-        clean_info "      Detecting Falcon cloud region..."
+        clean_info "Using Client ID: ${FALCON_CLIENT_ID:0:8}..."
+        clean_info "Detecting Falcon cloud region..."
     fi
 
     # Step 1: Get Falcon CID
@@ -233,70 +233,70 @@ get_falcon_configuration() {
         clean_info "Fetching Customer ID (CID)..."
     fi
     if ! FALCON_CID=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-cid 2>/dev/null); then
-        log_error "Failed to retrieve Falcon CID"
-        echo "      Verify FALCON_CLIENT_ID and FALCON_CLIENT_SECRET are correct"
-        [[ "$VERBOSE" == "true" ]] && echo "      API Error: Authentication may have failed"
+        clean_error "Failed to retrieve Falcon CID"
+        echo "Verify FALCON_CLIENT_ID and FALCON_CLIENT_SECRET are correct"
+        [[ "$VERBOSE" == "true" ]] && echo "API Error: Authentication may have failed"
         exit 1
     fi
     export FALCON_CID
-    [[ "$VERBOSE" == "true" ]] && clean_success "      Customer ID: ${FALCON_CID:0:20}..."
+    [[ "$VERBOSE" == "true" ]] && clean_success "Customer ID: ${FALCON_CID:0:20}..."
 
     # Step 2: Get encoded Docker config pull token
     if [[ "$VERBOSE" == "true" ]]; then
         clean_info "Generating container registry credentials..."
     fi
     if ! ENCODED_DOCKER_CONFIG=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-pull-token 2>/dev/null); then
-        log_error "Failed to retrieve Docker registry credentials"
-        [[ "$VERBOSE" == "true" ]] && echo "      API Error: Registry token generation failed"
+        clean_error "Failed to retrieve Docker registry credentials"
+        [[ "$VERBOSE" == "true" ]] && echo "API Error: Registry token generation failed"
         exit 1
     fi
     export ENCODED_DOCKER_CONFIG
-    [[ "$VERBOSE" == "true" ]] && clean_success "      Registry credentials generated (${#ENCODED_DOCKER_CONFIG} chars)"
+    [[ "$VERBOSE" == "true" ]] && clean_success "Registry credentials generated (${#ENCODED_DOCKER_CONFIG} chars)"
 
     # Step 3: Get Falcon Sensor image configuration
     if [[ "$VERBOSE" == "true" ]]; then
         clean_info "Retrieving Falcon Sensor image information..."
     fi
     if ! FALCON_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-image-path 2>/dev/null); then
-        log_error "Failed to retrieve Falcon Sensor image path"
-        [[ "$VERBOSE" == "true" ]] && echo "      API Error: Sensor image metadata unavailable"
+        clean_error "Failed to retrieve Falcon Sensor image path"
+        [[ "$VERBOSE" == "true" ]] && echo "API Error: Sensor image metadata unavailable"
         exit 1
     fi
     export SENSOR_REGISTRY=$(echo $FALCON_IMAGE_FULL_PATH | cut -d':' -f 1)
     export SENSOR_IMAGE_TAG=$(echo $FALCON_IMAGE_FULL_PATH | cut -d':' -f 2)
-    [[ "$VERBOSE" == "true" ]] && clean_success "      Sensor Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
+    [[ "$VERBOSE" == "true" ]] && clean_success "Sensor Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
 
     # Step 4: Get Falcon KAC image configuration
     if [[ "$VERBOSE" == "true" ]]; then
         clean_info "Retrieving Falcon KAC image information..."
     fi
     if ! FALCON_KAC_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-kac --get-image-path 2>/dev/null); then
-        log_error "Failed to retrieve Falcon KAC image path"
-        [[ "$VERBOSE" == "true" ]] && echo "      API Error: KAC image metadata unavailable"
+        clean_error "Failed to retrieve Falcon KAC image path"
+        [[ "$VERBOSE" == "true" ]] && echo "API Error: KAC image metadata unavailable"
         exit 1
     fi
     export KAC_REGISTRY=$(echo $FALCON_KAC_IMAGE_FULL_PATH | cut -d':' -f 1)
     export KAC_IMAGE_TAG=$(echo $FALCON_KAC_IMAGE_FULL_PATH | cut -d':' -f 2)
-    [[ "$VERBOSE" == "true" ]] && clean_success "      KAC Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
+    [[ "$VERBOSE" == "true" ]] && clean_success "KAC Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
 
     # Step 5: Get Falcon Image Analyzer configuration
     if [[ "$VERBOSE" == "true" ]]; then
         clean_info "Retrieving Falcon Image Analyzer information..."
     fi
     if ! FALCON_IAR_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-imageanalyzer --get-image-path 2>/dev/null); then
-        log_error "Failed to retrieve Falcon Image Analyzer image path"
-        [[ "$VERBOSE" == "true" ]] && echo "      API Error: Image Analyzer metadata unavailable"
+        clean_error "Failed to retrieve Falcon Image Analyzer image path"
+        [[ "$VERBOSE" == "true" ]] && echo "API Error: Image Analyzer metadata unavailable"
         exit 1
     fi
     export IAR_REGISTRY=$(echo $FALCON_IAR_IMAGE_FULL_PATH | cut -d':' -f 1)
     export IAR_IMAGE_TAG=$(echo $FALCON_IAR_IMAGE_FULL_PATH | cut -d':' -f 2)
-    [[ "$VERBOSE" == "true" ]] && clean_success "      IAR Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
+    [[ "$VERBOSE" == "true" ]] && clean_success "IAR Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
 
     clean_success "Falcon configuration retrieved"
     if [[ "$VERBOSE" == "true" ]]; then
-        clean_info "      ✓ Customer ID acquired"
-        clean_info "      ✓ Registry access configured"
-        clean_info "      ✓ All component images resolved"
+        clean_info "✓ Customer ID acquired"
+        clean_info "✓ Registry access configured"
+        clean_info "✓ All component images resolved"
     fi
 }
 
@@ -305,42 +305,42 @@ show_configuration() {
     print_section "DEPLOYMENT CONFIGURATION"
 
     clean_info "Customer configuration:"
-    echo "      CID: $FALCON_CID"
-    echo "      Cluster: $CLUSTERNAME"
+    echo "CID: $FALCON_CID"
+    echo "Cluster: $CLUSTERNAME"
     if [[ "$VERBOSE" == "true" ]]; then
-        echo "      Registry token: ${#ENCODED_DOCKER_CONFIG} characters"
-        echo "      Client ID: ${FALCON_CLIENT_ID:0:12}..."
+        echo "Registry token: ${#ENCODED_DOCKER_CONFIG} characters"
+        echo "Client ID: ${FALCON_CLIENT_ID:0:12}..."
     fi
 
     echo
     clean_info "Selected components:"
     if [[ "$INSTALL_SENSOR" == "true" ]]; then
-        clean_success "      ✅ Falcon Sensor"
-        [[ "$VERBOSE" == "true" ]] && echo "         Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
+        clean_success "✅ Falcon Sensor"
+        [[ "$VERBOSE" == "true" ]] && echo "Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
     else
-        clean_warning "      ❌ Falcon Sensor (disabled)"
+        clean_warning "❌ Falcon Sensor (disabled)"
     fi
 
     if [[ "$INSTALL_KAC" == "true" ]]; then
-        clean_success "      ✅ Falcon KAC"
-        [[ "$VERBOSE" == "true" ]] && echo "         Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
+        clean_success "✅ Falcon KAC"
+        [[ "$VERBOSE" == "true" ]] && echo "Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
     else
-        clean_warning "      ❌ Falcon KAC (disabled)"
+        clean_warning "❌ Falcon KAC (disabled)"
     fi
 
     if [[ "$INSTALL_IAR" == "true" ]]; then
-        clean_success "      ✅ Falcon Image Analyzer"
-        [[ "$VERBOSE" == "true" ]] && echo "         Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
+        clean_success "✅ Falcon Image Analyzer"
+        [[ "$VERBOSE" == "true" ]] && echo "Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
     else
-        clean_warning "      ❌ Falcon Image Analyzer (disabled)"
+        clean_warning "❌ Falcon Image Analyzer (disabled)"
     fi
 
     echo
     clean_info "Cluster configuration:"
     if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
-        clean_success "      ⚙️  GKE Autopilot mode"
+        clean_success "⚙️  GKE Autopilot mode"
     else
-        clean_info "      🖥️  Standard Kubernetes"
+        clean_info "🖥️  Standard Kubernetes"
     fi
 }
 
@@ -370,7 +370,7 @@ add_helm_repo() {
 configure_gke_autopilot() {
     if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
         print_section "GKE AUTOPILOT CONFIGURATION"
-        log_info "Configuring GKE Autopilot AllowlistSynchronizer..."
+        clean_info "Configuring GKE Autopilot AllowlistSynchronizer..."
 
         # Create AllowlistSynchronizer YAML
         cat > allowlist-synchronizer.yaml << EOF
@@ -385,25 +385,25 @@ EOF
 
         # Apply AllowlistSynchronizer
         if kubectl apply -f allowlist-synchronizer.yaml >/dev/null 2>&1; then
-            log_success "AllowlistSynchronizer created successfully"
+            clean_success "AllowlistSynchronizer created successfully"
 
             # Wait for it to be ready
-            log_info "Waiting for AllowlistSynchronizer to be ready..."
+            clean_info "Waiting for AllowlistSynchronizer to be ready..."
             sleep 5
 
             # Verify AllowlistSynchronizer
             if kubectl get allowlistsynchronizers crowdstrike-synchronizer >/dev/null 2>&1; then
                 if kubectl get workloadallowlists >/dev/null 2>&1; then
-                    log_success "GKE Autopilot configuration complete"
+                    clean_success "GKE Autopilot configuration complete"
                 else
-                    log_warning "WorkloadAllowlists may still be loading"
+                    clean_warning "WorkloadAllowlists may still be loading"
                 fi
             else
-                log_error "AllowlistSynchronizer failed to start"
+                clean_error "AllowlistSynchronizer failed to start"
                 exit 1
             fi
         else
-            log_error "Failed to create AllowlistSynchronizer"
+            clean_error "Failed to create AllowlistSynchronizer"
             exit 1
         fi
 
@@ -418,8 +418,8 @@ deploy_falcon() {
 
     # Check if release already exists
     if helm list -n falcon-platform | grep -q "falcon-platform"; then
-        log_info "Existing falcon-platform release found"
-        [[ "$VERBOSE" == "true" ]] && log_info "   Performing upgrade instead of fresh install"
+        clean_info "Existing falcon-platform release found"
+        [[ "$VERBOSE" == "true" ]] && clean_info "Performing upgrade instead of fresh install"
         local helm_operation="upgrade"
 
         # Detect currently deployed components by checking for actual running pods
@@ -427,27 +427,27 @@ deploy_falcon() {
         local existing_kac=$(kubectl get pods -n falcon-kac -l app.kubernetes.io/name=falcon-kac >/dev/null 2>&1 && echo "true" || echo "false")
         local existing_iar=$(kubectl get pods -n falcon-image-analyzer -l app.kubernetes.io/name=falcon-image-analyzer >/dev/null 2>&1 && echo "true" || echo "false")
 
-        log_info "Current deployment state:"
-        [[ "$existing_sensor" == "true" ]] && log_info "  - Falcon Sensor: Currently deployed" || log_info "  - Falcon Sensor: Not deployed"
-        [[ "$existing_kac" == "true" ]] && log_info "  - Falcon KAC: Currently deployed" || log_info "  - Falcon KAC: Not deployed"
-        [[ "$existing_iar" == "true" ]] && log_info "  - Falcon IAR: Currently deployed" || log_info "  - Falcon IAR: Not deployed"
+        clean_info "Current deployment state:"
+        [[ "$existing_sensor" == "true" ]] && clean_info "Falcon Sensor: Currently deployed" || clean_info "Falcon Sensor: Not deployed"
+        [[ "$existing_kac" == "true" ]] && clean_info "Falcon KAC: Currently deployed" || clean_info "Falcon KAC: Not deployed"
+        [[ "$existing_iar" == "true" ]] && clean_info "Falcon IAR: Currently deployed" || clean_info "Falcon IAR: Not deployed"
 
         # Create component namespaces for NEW components being enabled (if namespaces don't exist)
         if [[ "$INSTALL_SENSOR" == "true" ]]; then
             if ! kubectl get namespace falcon-system >/dev/null 2>&1; then
-                log_info "Creating falcon-system namespace for Sensor deployment..."
+                clean_info "Creating falcon-system namespace for Sensor deployment..."
                 kubectl create namespace falcon-system
             fi
         fi
         if [[ "$INSTALL_KAC" == "true" ]]; then
             if ! kubectl get namespace falcon-kac >/dev/null 2>&1; then
-                log_info "Creating falcon-kac namespace for KAC deployment..."
+                clean_info "Creating falcon-kac namespace for KAC deployment..."
                 kubectl create namespace falcon-kac
             fi
         fi
         if [[ "$INSTALL_IAR" == "true" ]]; then
             if ! kubectl get namespace falcon-image-analyzer >/dev/null 2>&1; then
-                log_info "Creating falcon-image-analyzer namespace for IAR deployment..."
+                clean_info "Creating falcon-image-analyzer namespace for IAR deployment..."
                 kubectl create namespace falcon-image-analyzer
             fi
         fi
@@ -458,7 +458,7 @@ deploy_falcon() {
             --set global.falcon.cid=$FALCON_CID \
             --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG"
     else
-        log_info "Installing new falcon-platform release..."
+        clean_info "Installing new falcon-platform release..."
         local helm_operation="install"
         local helm_cmd="helm install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
             --namespace falcon-platform \
@@ -511,12 +511,12 @@ deploy_falcon() {
     if [[ "$VERBOSE" == "true" ]]; then
         if eval $helm_cmd; then
             if [[ "$helm_operation" == "upgrade" ]]; then
-                log_success "Falcon Platform upgraded successfully!"
+                clean_success "Falcon Platform upgraded successfully!"
             else
-                log_success "Falcon Platform deployed successfully!"
+                clean_success "Falcon Platform deployed successfully!"
             fi
         else
-            log_error "Failed to deploy Falcon Platform"
+            clean_error "Failed to deploy Falcon Platform"
             exit 1
         fi
     else
@@ -546,14 +546,14 @@ deploy_falcon() {
         if wait $deploy_pid; then
             echo " ✓"
             if [[ "$helm_operation" == "upgrade" ]]; then
-                log_success "Falcon Platform upgraded successfully!"
+                clean_success "Falcon Platform upgraded successfully!"
             else
-                log_success "Falcon Platform deployed successfully!"
+                clean_success "Falcon Platform deployed successfully!"
             fi
         else
             echo " ✗"
-            log_error "Failed to deploy Falcon Platform"
-            log_info "Re-running deployment with verbose output for troubleshooting..."
+            clean_error "Failed to deploy Falcon Platform"
+            clean_info "Re-running deployment with verbose output for troubleshooting..."
             eval $helm_cmd
             exit 1
         fi
@@ -562,7 +562,7 @@ deploy_falcon() {
 
 # Verify deployment
 verify_deployment() {
-    log_info "Verifying deployment..."
+    clean_info "Verifying deployment..."
 
     # Wait for pods to be ready with progress indicator (10 seconds total)
     echo -ne "${BLUE}[INFO]${NC} Waiting for pods to start"
@@ -574,7 +574,7 @@ verify_deployment() {
 
     # Show deployment status
     echo
-    log_info "Deployment Status:"
+    clean_info "Deployment Status:"
     echo "==================="
 
     # Show helm release
@@ -585,15 +585,15 @@ verify_deployment() {
     echo "Falcon Pods:"
     kubectl get pods -A | grep falcon || echo "No falcon pods found yet"
 
-    log_success "Initial verification complete!"
+    clean_success "Initial verification complete!"
     echo
-    log_info "Note: Pods may take several minutes to fully start and become ready"
+    clean_info "Note: Pods may take several minutes to fully start and become ready"
 }
 
 # Print success message and next steps
 print_success() {
     echo
-    log_success "🎉 CrowdStrike Falcon Platform has been successfully deployed!"
+    clean_success "🎉 CrowdStrike Falcon Platform has been successfully deployed!"
     echo
     echo "Components deployed:"
     if [[ "$INSTALL_SENSOR" == "true" ]]; then
@@ -623,7 +623,7 @@ print_success() {
 cleanup() {
     if [[ -f "falcon-container-sensor-pull.sh" ]]; then
         rm -f falcon-container-sensor-pull.sh
-        log_info "Cleaned up temporary files"
+        clean_info "Cleaned up temporary files"
     fi
 }
 
@@ -647,7 +647,7 @@ main() {
 }
 
 # Trap errors and cleanup
-trap 'log_error "Script failed at line $LINENO"; cleanup' ERR
+trap 'clean_error "Script failed at line $LINENO"; cleanup' ERR
 
 # Run main function
 main "$@"
