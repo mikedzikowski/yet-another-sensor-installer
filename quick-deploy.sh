@@ -423,37 +423,55 @@ EOF
 deploy_falcon() {
     print_section "FALCON PLATFORM DEPLOYMENT"
 
-    # Check if release already exists with more robust detection
+    # Check if release already exists with comprehensive detection
     local existing_release=""
+    local release_namespace=""
+    local helm_operation="install"
+    local target_namespace="falcon-platform"
 
-    # First check if falcon-platform namespace exists
-    if kubectl get namespace falcon-platform >/dev/null 2>&1; then
-        # Check for existing helm release in any namespace
-        existing_release=$(helm list -A -q | grep "^falcon-platform$" || echo "")
+    # First, check for ANY falcon-platform release across ALL namespaces
+    if helm list -A -o json 2>/dev/null | grep -q "falcon-platform"; then
+        # Get detailed release info
+        local release_info=$(helm list -A | grep "falcon-platform" | head -n1)
+        if [[ -n "$release_info" ]]; then
+            existing_release=$(echo "$release_info" | awk '{print $1}')
+            release_namespace=$(echo "$release_info" | awk '{print $2}')
 
-        if [[ -n "$existing_release" ]]; then
-            # Get the namespace of the existing release
-            local release_namespace=$(helm list -A | grep "falcon-platform" | awk '{print $2}')
-            clean_info "Existing falcon-platform release found in namespace: $release_namespace"
+            clean_info "Existing falcon-platform release found:"
+            clean_info "  Release: $existing_release"
+            clean_info "  Namespace: $release_namespace"
             [[ "$VERBOSE" == "true" ]] && clean_info "Performing upgrade instead of fresh install"
-            local helm_operation="upgrade"
 
-            # Ensure we're using the correct namespace for upgrade
-            local target_namespace="falcon-platform"
-            if [[ "$release_namespace" != "$target_namespace" ]]; then
-                clean_info "Release is in $release_namespace, will upgrade there"
-                target_namespace="$release_namespace"
-            fi
-        else
-            clean_info "falcon-platform namespace exists but no helm release found"
-            clean_info "This might be from a partial install - proceeding with fresh install"
-            local helm_operation="install"
-            local target_namespace="falcon-platform"
+            helm_operation="upgrade"
+            target_namespace="$release_namespace"
         fi
     else
-        clean_info "Installing new falcon-platform release..."
-        local helm_operation="install"
-        local target_namespace="falcon-platform"
+        # Double-check with a more thorough search
+        local all_releases=$(helm list -A -q 2>/dev/null || echo "")
+        if echo "$all_releases" | grep -q "^falcon-platform$"; then
+            clean_warning "Found falcon-platform release but couldn't get namespace info"
+            clean_info "Attempting to find the release namespace..."
+
+            # Try to find it in common namespaces
+            for ns in falcon-platform default kube-system; do
+                if helm list -n "$ns" -q 2>/dev/null | grep -q "^falcon-platform$"; then
+                    release_namespace="$ns"
+                    clean_info "Found release in namespace: $ns"
+                    helm_operation="upgrade"
+                    target_namespace="$ns"
+                    break
+                fi
+            done
+
+            if [[ "$helm_operation" == "install" ]]; then
+                clean_error "Detected existing falcon-platform release but cannot determine namespace"
+                clean_info "Please run cleanup first: ./quick-deploy.sh cleanup"
+                exit 1
+            fi
+        else
+            clean_info "No existing falcon-platform release found"
+            clean_info "Proceeding with fresh installation"
+        fi
     fi
 
     # Show current deployment state if upgrading
@@ -663,22 +681,44 @@ print_success() {
 cleanup_deployment() {
     clean_info "🧹 Cleaning up existing Falcon deployment..."
 
-    # Remove Helm release
-    helm uninstall falcon-platform -n falcon-platform --ignore-not-found 2>/dev/null || {
-        # Try finding release in any namespace
-        local release_ns=$(helm list -A | grep falcon-platform | awk '{print $2}' | head -n1)
-        if [[ -n "$release_ns" ]]; then
-            helm uninstall falcon-platform -n "$release_ns" --ignore-not-found
+    # Find and remove ALL falcon-platform releases in ANY namespace
+    clean_info "Searching for falcon-platform releases across all namespaces..."
+    local releases_found=false
+
+    # Get all releases and filter for falcon-platform
+    while IFS= read -r release_line; do
+        if [[ -n "$release_line" && "$release_line" == *"falcon-platform"* ]]; then
+            releases_found=true
+            local release_name=$(echo "$release_line" | awk '{print $1}')
+            local release_ns=$(echo "$release_line" | awk '{print $2}')
+
+            clean_info "Removing release '$release_name' from namespace '$release_ns'..."
+            helm uninstall "$release_name" -n "$release_ns" --ignore-not-found || {
+                clean_warning "Failed to remove release $release_name from $release_ns"
+            }
         fi
+    done < <(helm list -A 2>/dev/null || echo "")
+
+    if [[ "$releases_found" == "false" ]]; then
+        clean_info "No falcon-platform releases found"
+    fi
+
+    # Remove namespaces with timeout
+    clean_info "Removing Falcon namespaces..."
+    kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer --ignore-not-found --timeout=60s 2>/dev/null || {
+        clean_warning "Some namespaces may take longer to delete (stuck finalizers)"
     }
 
-    # Remove namespaces
-    kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer --ignore-not-found --timeout=30s
-
     # Remove ValidatingWebhookConfigurations
-    kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=falcon-platform --ignore-not-found
+    clean_info "Removing webhook configurations..."
+    kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=falcon-platform --ignore-not-found 2>/dev/null || true
+
+    # Additional cleanup for stuck resources
+    clean_info "Cleaning up any remaining Falcon resources..."
+    kubectl delete all,pvc,secrets,configmaps -l app.kubernetes.io/instance=falcon-platform --all-namespaces --ignore-not-found --timeout=30s 2>/dev/null || true
 
     clean_success "Cleanup completed"
+    clean_info "You can now run the deployment again"
 }
 
 # Cleanup function
