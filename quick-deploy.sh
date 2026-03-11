@@ -179,24 +179,55 @@ check_prerequisites() {
         exit 1
     fi
 
-    # Check helm version (support Helm 3.x and 4.x)
-    local helm_version_output=$(helm version 2>/dev/null | head -n1)
+    # Check helm version (support Helm 3.x and 4.x with backwards compatibility)
+    local helm_version_output=""
     local helm_version=""
+    local major_version=""
 
-    # Extract version number from different helm version output formats
-    if [[ "$helm_version_output" =~ Version:\"v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
-        local major_version="${BASH_REMATCH[1]}"
-        helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+    # Try modern helm version command first (works with both 3.x and 4.x)
+    helm_version_output=$(helm version 2>/dev/null | head -n1 || echo "")
 
-        # Check for supported versions (3.x or 4.x)
-        if [[ "$major_version" != "3" && "$major_version" != "4" ]]; then
-            clean_error "Helm 3.x or 4.x required (found: $helm_version)"
-            echo "Install or upgrade Helm: https://helm.sh/docs/intro/install/"
-            exit 1
+    if [[ -n "$helm_version_output" ]]; then
+        # Try to extract version using regex for BuildInfo format
+        if [[ "$helm_version_output" =~ Version:\"v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+            major_version="${BASH_REMATCH[1]}"
+            helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
         fi
-    else
+    fi
+
+    # Fallback: Try legacy helm version command for older Helm 3.x installations
+    if [[ -z "$helm_version" ]]; then
+        local legacy_output=$(helm version --short --client 2>/dev/null || echo "")
+        if [[ -n "$legacy_output" ]]; then
+            # Legacy format: "v3.12.3+g3a31588" or "Client: v3.12.3+g3a31588"
+            if [[ "$legacy_output" =~ v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+                major_version="${BASH_REMATCH[1]}"
+                helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+            fi
+        fi
+    fi
+
+    # Final fallback: Try basic version parsing
+    if [[ -z "$helm_version" ]]; then
+        local basic_output=$(helm version --short 2>/dev/null || helm version -c 2>/dev/null || echo "")
+        if [[ -n "$basic_output" && "$basic_output" =~ v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+            major_version="${BASH_REMATCH[1]}"
+            helm_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+        fi
+    fi
+
+    # Validate we got a version
+    if [[ -z "$helm_version" || -z "$major_version" ]]; then
         clean_error "Unable to detect Helm version"
-        echo "Ensure Helm is properly installed: https://helm.sh/docs/intro/install/"
+        echo "Helm command output was: '$helm_version_output'"
+        echo "Please ensure Helm is properly installed: https://helm.sh/docs/intro/install/"
+        exit 1
+    fi
+
+    # Check for supported versions (3.x or 4.x)
+    if [[ "$major_version" != "3" && "$major_version" != "4" ]]; then
+        clean_error "Helm 3.x or 4.x required (found: $helm_version)"
+        echo "Install or upgrade Helm: https://helm.sh/docs/intro/install/"
         exit 1
     fi
 
