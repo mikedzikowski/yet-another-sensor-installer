@@ -53,8 +53,24 @@ show_progress() {
     echo " ✓"
 }
 
+# Add visual separator function
+print_separator() {
+    echo "────────────────────────────────────────────────────────────────"
+}
+
+# Add section header function
+print_section() {
+    local title="$1"
+    echo
+    print_separator
+    echo "🔧 $title"
+    print_separator
+    echo
+}
+
+echo
 echo "🛡️  CrowdStrike Falcon Simple Deployment"
-echo "========================================"
+print_separator
 echo
 
 # Check if running as root (not recommended)
@@ -71,14 +87,14 @@ check_root() {
 
 # Component selection using environment variables
 select_components() {
-    log_info "Configuring CrowdStrike components..."
+    print_section "COMPONENT CONFIGURATION"
 
-    log_info "Available customization options:"
-    log_info "  export INSTALL_SENSOR=false    # to disable Sensor"
-    log_info "  export INSTALL_KAC=false       # to disable KAC"
-    log_info "  export INSTALL_IAR=false       # to disable IAR"
-    log_info "  export IS_GKE_AUTOPILOT=true   # to enable GKE Autopilot"
-    log_info "  export VERBOSE=true             # to enable verbose output"
+    log_info "Customization options:"
+    echo "   export INSTALL_SENSOR=false    # disable Sensor"
+    echo "   export INSTALL_KAC=false       # disable KAC"
+    echo "   export INSTALL_IAR=false       # disable IAR"
+    echo "   export IS_GKE_AUTOPILOT=true   # enable GKE Autopilot"
+    echo "   export VERBOSE=true             # enable verbose output"
     echo
 
     # Read environment variables or use defaults
@@ -87,16 +103,19 @@ select_components() {
     INSTALL_IAR="${INSTALL_IAR:-true}"
     IS_GKE_AUTOPILOT="${IS_GKE_AUTOPILOT:-false}"
 
-    # Log final selections
-    log_info "Component selections:"
-    [[ "$INSTALL_SENSOR" == "true" ]] && log_success "✅ Falcon Sensor will be installed" || log_warning "❌ Falcon Sensor disabled"
-    [[ "$INSTALL_KAC" == "true" ]] && log_success "✅ Falcon KAC will be installed" || log_warning "❌ Falcon KAC disabled"
-    [[ "$INSTALL_IAR" == "true" ]] && log_success "✅ Falcon Image Analyzer will be installed" || log_warning "❌ Falcon Image Analyzer disabled"
-    [[ "$IS_GKE_AUTOPILOT" == "true" ]] && log_success "⚙️  GKE Autopilot mode enabled" || log_info "Standard Kubernetes mode"
+    # Log selections with better formatting
+    log_info "Selected components:"
+    [[ "$INSTALL_SENSOR" == "true" ]] && log_success "   ✅ Falcon Sensor" || log_warning "   ❌ Falcon Sensor"
+    [[ "$INSTALL_KAC" == "true" ]] && log_success "   ✅ Falcon KAC" || log_warning "   ❌ Falcon KAC"
+    [[ "$INSTALL_IAR" == "true" ]] && log_success "   ✅ Falcon Image Analyzer" || log_warning "   ❌ Falcon Image Analyzer"
+
     echo
+    log_info "Cluster type:"
+    [[ "$IS_GKE_AUTOPILOT" == "true" ]] && log_success "   ⚙️  GKE Autopilot" || log_info "   🖥️  Standard Kubernetes"
 
     # Validate at least one component is selected
     if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" ]]; then
+        echo
         log_error "At least one component must be selected"
         exit 1
     fi
@@ -104,7 +123,7 @@ select_components() {
 
 # Validate required environment variables
 validate_environment() {
-    log_info "Validating environment variables..."
+    print_section "ENVIRONMENT VALIDATION"
 
     local missing_vars=()
 
@@ -121,75 +140,72 @@ validate_environment() {
     fi
 
     if [[ ${#missing_vars[@]} -gt 0 ]]; then
-        log_error "Missing required environment variables:"
+        log_error "Missing required variables:"
         for var in "${missing_vars[@]}"; do
-            echo "  - $var"
+            echo "   • $var"
         done
         echo
-        echo "Please export the required variables first:"
-        echo "  export FALCON_CLIENT_ID=\"your-falcon-oauth-client-id\""
-        echo "  export FALCON_CLIENT_SECRET=\"your-falcon-oauth-client-secret\""
-        echo "  export CLUSTERNAME=\"your-cluster-name\""
-        echo
-        echo "Then run this script again."
+        echo "Set the required variables:"
+        echo "   export FALCON_CLIENT_ID=\"your-client-id\""
+        echo "   export FALCON_CLIENT_SECRET=\"your-client-secret\""
+        echo "   export CLUSTERNAME=\"your-cluster-name\""
         exit 1
     fi
 
-    log_success "All required environment variables are set"
-    log_info "Using CLUSTERNAME: $CLUSTERNAME"
-    log_info "Using FALCON_CLIENT_ID: ${FALCON_CLIENT_ID:0:8}..."
-    echo
+    log_success "Environment variables validated"
+    log_info "   Cluster: $CLUSTERNAME"
+    log_info "   Client ID: ${FALCON_CLIENT_ID:0:8}..."
 }
 
 # Check prerequisites
 check_prerequisites() {
-    log_info "Checking prerequisites..."
+    print_section "PREREQUISITES CHECK"
 
-    # Check if kubectl is installed and working
+    # Check kubectl
     if ! command -v kubectl &> /dev/null; then
-        log_error "kubectl is not installed or not in PATH"
-        echo "Please install kubectl: https://kubernetes.io/docs/tasks/tools/"
+        log_error "kubectl not found"
+        echo "   Install: https://kubernetes.io/docs/tasks/tools/"
         exit 1
     fi
 
-    # Check kubectl connectivity
     if ! kubectl cluster-info &> /dev/null; then
         log_error "Cannot connect to Kubernetes cluster"
-        echo "Please ensure kubectl is configured to connect to your cluster"
+        echo "   Configure kubectl to connect to your cluster"
         exit 1
     fi
 
-    # Check if helm is installed
+    # Check helm
     if ! command -v helm &> /dev/null; then
-        log_error "Helm is not installed or not in PATH"
-        echo "Please install Helm 3.x: https://helm.sh/docs/intro/install/"
+        log_error "Helm not found"
+        echo "   Install: https://helm.sh/docs/intro/install/"
         exit 1
     fi
 
-    # Check helm version (require 3.x)
     local helm_version=$(helm version --short --client 2>/dev/null | cut -d':' -f2 | cut -d'v' -f2 | cut -d'.' -f1)
     if [[ "$helm_version" != "3" ]]; then
-        log_error "Helm 3.x is required (found version: $(helm version --short --client 2>/dev/null))"
+        log_error "Helm 3.x required (found: $(helm version --short --client 2>/dev/null))"
         exit 1
     fi
 
-    # Check if curl is installed
+    # Check curl
     if ! command -v curl &> /dev/null; then
-        log_error "curl is not installed or not in PATH"
-        echo "Please install curl"
+        log_error "curl not found"
         exit 1
     fi
 
-    log_success "All prerequisites are installed"
+    log_success "All prerequisites verified"
+    log_info "   ✓ kubectl connected to cluster"
+    log_info "   ✓ Helm 3.x available"
+    log_info "   ✓ curl available"
 }
 
 # Download CrowdStrike falcon-container-sensor-pull.sh script
 download_falcon_script() {
-    log_info "Downloading CrowdStrike falcon-container-sensor-pull.sh script..."
+    print_section "FALCON SCRIPT DOWNLOAD"
 
     if curl -sSL -o falcon-container-sensor-pull.sh "https://github.com/CrowdStrike/falcon-scripts/releases/latest/download/falcon-container-sensor-pull.sh"; then
         chmod +x falcon-container-sensor-pull.sh
-        log_success "Downloaded and configured falcon-container-sensor-pull.sh"
+        log_success "Official CrowdStrike script downloaded"
     else
         log_error "Failed to download falcon-container-sensor-pull.sh"
         exit 1
@@ -198,6 +214,7 @@ download_falcon_script() {
 
 # Get Falcon configuration using the official script
 get_falcon_configuration() {
+    print_section "FALCON CONFIGURATION"
     log_info "Retrieving Falcon configuration..."
 
     # Step 1: Get Falcon CID
