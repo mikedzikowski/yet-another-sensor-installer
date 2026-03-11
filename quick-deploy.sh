@@ -493,24 +493,24 @@ deploy_falcon() {
     local helm_cmd=""
     if [[ "$helm_operation" == "upgrade" ]]; then
         helm_cmd="helm upgrade --install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
-            --namespace $target_namespace \
-            --set global.falcon.cid=$FALCON_CID \
-            --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG"
+            --namespace \"$target_namespace\" \
+            --set global.falcon.cid=\"$FALCON_CID\" \
+            --set global.containerRegistry.configJSON=\"$ENCODED_DOCKER_CONFIG\""
     else
         helm_cmd="helm install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
-            --namespace $target_namespace \
+            --namespace \"$target_namespace\" \
             --create-namespace \
             --set createComponentNamespaces=true \
-            --set global.falcon.cid=$FALCON_CID \
-            --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG"
+            --set global.falcon.cid=\"$FALCON_CID\" \
+            --set global.containerRegistry.configJSON=\"$ENCODED_DOCKER_CONFIG\""
     fi
 
     # Add Falcon Sensor settings if enabled
     if [[ "$INSTALL_SENSOR" == "true" ]]; then
         helm_cmd="$helm_cmd \
         --set falcon-sensor.enabled=true \
-        --set falcon-sensor.node.image.repository=$SENSOR_REGISTRY \
-        --set falcon-sensor.node.image.tag=$SENSOR_IMAGE_TAG"
+        --set falcon-sensor.node.image.repository=\"$SENSOR_REGISTRY\" \
+        --set falcon-sensor.node.image.tag=\"$SENSOR_IMAGE_TAG\""
 
         # Add GKE Autopilot settings if needed
         if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
@@ -525,8 +525,8 @@ deploy_falcon() {
     if [[ "$INSTALL_KAC" == "true" ]]; then
         helm_cmd="$helm_cmd \
         --set falcon-kac.enabled=true \
-        --set falcon-kac.image.repository=$KAC_REGISTRY \
-        --set falcon-kac.image.tag=$KAC_IMAGE_TAG"
+        --set falcon-kac.image.repository=\"$KAC_REGISTRY\" \
+        --set falcon-kac.image.tag=\"$KAC_IMAGE_TAG\""
     else
         helm_cmd="$helm_cmd --set falcon-kac.enabled=false"
     fi
@@ -535,17 +535,20 @@ deploy_falcon() {
     if [[ "$INSTALL_IAR" == "true" ]]; then
         helm_cmd="$helm_cmd \
         --set falcon-image-analyzer.deployment.enabled=true \
-        --set falcon-image-analyzer.image.repository=$IAR_REGISTRY \
-        --set falcon-image-analyzer.image.tag=$IAR_IMAGE_TAG \
-        --set falcon-image-analyzer.crowdstrikeConfig.clusterName=$CLUSTERNAME \
-        --set falcon-image-analyzer.crowdstrikeConfig.clientID=$FALCON_CLIENT_ID \
-        --set falcon-image-analyzer.crowdstrikeConfig.clientSecret=$FALCON_CLIENT_SECRET"
+        --set falcon-image-analyzer.image.repository=\"$IAR_REGISTRY\" \
+        --set falcon-image-analyzer.image.tag=\"$IAR_IMAGE_TAG\" \
+        --set falcon-image-analyzer.crowdstrikeConfig.clusterName=\"$CLUSTERNAME\" \
+        --set falcon-image-analyzer.crowdstrikeConfig.clientID=\"$FALCON_CLIENT_ID\" \
+        --set falcon-image-analyzer.crowdstrikeConfig.clientSecret=\"$FALCON_CLIENT_SECRET\""
     else
         helm_cmd="$helm_cmd --set falcon-image-analyzer.enabled=false"
     fi
 
     # Execute the deployment command with conditional verbosity and progress indication
     if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "Executing helm command:"
+        echo "$helm_cmd"
+        echo
         if eval $helm_cmd; then
             if [[ "$helm_operation" == "upgrade" ]]; then
                 clean_success "Falcon Platform upgraded successfully!"
