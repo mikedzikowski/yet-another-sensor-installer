@@ -544,29 +544,41 @@ deploy_falcon() {
 
     # Fallback if jq not available - search with grep
     if [[ -z "$falcon_releases" ]]; then
-        falcon_releases=$(helm list -A 2>/dev/null | grep -E "(falcon-platform|falcon-kac|falcon-sensor|falcon-helm|falcon-image-analyzer)" | head -n1 || echo "")
+        falcon_releases=$(helm list -A 2>/dev/null | grep -E "(falcon-platform|falcon-kac|falcon-sensor|falcon-helm|falcon-image-analyzer)" || echo "")
     fi
 
     if [[ -n "$falcon_releases" ]]; then
-        # Parse the first found release
-        existing_release=$(echo "$falcon_releases" | head -n1 | awk '{print $1}')
-        release_namespace=$(echo "$falcon_releases" | head -n1 | awk '{print $2}')
+        # Check if there's a falcon-platform release (umbrella chart)
+        local platform_release=$(echo "$falcon_releases" | grep "falcon-platform" | head -n1)
 
-        clean_warning "Found existing Falcon release:"
-        clean_info "  Release: $existing_release"
-        clean_info "  Namespace: $release_namespace"
-        clean_warning "Cannot proceed with fresh installation due to conflicting releases"
-        clean_info ""
-        clean_info "SOLUTION: Run cleanup first to remove all existing Falcon installations:"
-        clean_info "  ./quick-deploy.sh cleanup"
-        clean_info ""
-        clean_info "All existing Falcon releases found:"
-        echo "$falcon_releases" | while read -r line; do
-            if [[ -n "$line" ]]; then
-                clean_info "  - $line"
-            fi
-        done
-        exit 1
+        if [[ -n "$platform_release" ]]; then
+            # Found falcon-platform release - we can upgrade it
+            existing_release=$(echo "$platform_release" | awk '{print $1}')
+            release_namespace=$(echo "$platform_release" | awk '{print $2}')
+
+            clean_info "Found existing falcon-platform release:"
+            clean_info "  Release: $existing_release"
+            clean_info "  Namespace: $release_namespace"
+            clean_info "Proceeding with upgrade instead of fresh install"
+
+            helm_operation="upgrade"
+            target_namespace="$release_namespace"
+        else
+            # Found other Falcon releases (individual components) - require cleanup
+            clean_warning "Found existing Falcon component releases that conflict:"
+            echo "$falcon_releases" | while read -r line; do
+                if [[ -n "$line" ]]; then
+                    clean_info "  - $line"
+                fi
+            done
+            clean_warning "Cannot install falcon-platform umbrella chart alongside individual component releases"
+            clean_info ""
+            clean_info "SOLUTION: Run cleanup first to remove existing component installations:"
+            clean_info "  ./quick-deploy.sh cleanup"
+            clean_info ""
+            clean_info "This will allow a fresh falcon-platform deployment that manages all components."
+            exit 1
+        fi
     else
         clean_info "No existing Falcon releases found"
         clean_info "Proceeding with fresh installation"
