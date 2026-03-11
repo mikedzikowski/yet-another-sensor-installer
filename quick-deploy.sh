@@ -533,55 +533,43 @@ deploy_falcon() {
     # Check for and resolve conflicting resources first
     check_conflicting_resources
 
-    # Check if release already exists with comprehensive detection
+    # Check if ANY Falcon release already exists (comprehensive detection)
     local existing_release=""
     local release_namespace=""
     local helm_operation="install"
     local target_namespace="falcon-platform"
 
-    # First, check for ANY falcon-platform release across ALL namespaces
-    if helm list -A -o json 2>/dev/null | grep -q "falcon-platform"; then
-        # Get detailed release info
-        local release_info=$(helm list -A | grep "falcon-platform" | head -n1)
-        if [[ -n "$release_info" ]]; then
-            existing_release=$(echo "$release_info" | awk '{print $1}')
-            release_namespace=$(echo "$release_info" | awk '{print $2}')
+    # Search for ANY Falcon-related releases across ALL namespaces
+    local falcon_releases=$(helm list -A -o json 2>/dev/null | jq -r '.[] | select(.name | test("falcon")) | "\(.name) \(.namespace)"' 2>/dev/null || echo "")
 
-            clean_info "Existing falcon-platform release found:"
-            clean_info "  Release: $existing_release"
-            clean_info "  Namespace: $release_namespace"
-            [[ "$VERBOSE" == "true" ]] && clean_info "Performing upgrade instead of fresh install"
+    # Fallback if jq not available - search with grep
+    if [[ -z "$falcon_releases" ]]; then
+        falcon_releases=$(helm list -A 2>/dev/null | grep -E "(falcon-platform|falcon-kac|falcon-sensor|falcon-helm|falcon-image-analyzer)" | head -n1 || echo "")
+    fi
 
-            helm_operation="upgrade"
-            target_namespace="$release_namespace"
-        fi
-    else
-        # Double-check with a more thorough search
-        local all_releases=$(helm list -A -q 2>/dev/null || echo "")
-        if echo "$all_releases" | grep -q "^falcon-platform$"; then
-            clean_warning "Found falcon-platform release but couldn't get namespace info"
-            clean_info "Attempting to find the release namespace..."
+    if [[ -n "$falcon_releases" ]]; then
+        # Parse the first found release
+        existing_release=$(echo "$falcon_releases" | head -n1 | awk '{print $1}')
+        release_namespace=$(echo "$falcon_releases" | head -n1 | awk '{print $2}')
 
-            # Try to find it in common namespaces
-            for ns in falcon-platform default kube-system; do
-                if helm list -n "$ns" -q 2>/dev/null | grep -q "^falcon-platform$"; then
-                    release_namespace="$ns"
-                    clean_info "Found release in namespace: $ns"
-                    helm_operation="upgrade"
-                    target_namespace="$ns"
-                    break
-                fi
-            done
-
-            if [[ "$helm_operation" == "install" ]]; then
-                clean_error "Detected existing falcon-platform release but cannot determine namespace"
-                clean_info "Please run cleanup first: ./quick-deploy.sh cleanup"
-                exit 1
+        clean_warning "Found existing Falcon release:"
+        clean_info "  Release: $existing_release"
+        clean_info "  Namespace: $release_namespace"
+        clean_warning "Cannot proceed with fresh installation due to conflicting releases"
+        clean_info ""
+        clean_info "SOLUTION: Run cleanup first to remove all existing Falcon installations:"
+        clean_info "  ./quick-deploy.sh cleanup"
+        clean_info ""
+        clean_info "All existing Falcon releases found:"
+        echo "$falcon_releases" | while read -r line; do
+            if [[ -n "$line" ]]; then
+                clean_info "  - $line"
             fi
-        else
-            clean_info "No existing falcon-platform release found"
-            clean_info "Proceeding with fresh installation"
-        fi
+        done
+        exit 1
+    else
+        clean_info "No existing Falcon releases found"
+        clean_info "Proceeding with fresh installation"
     fi
 
     # Show current deployment state if upgrading
@@ -791,13 +779,13 @@ print_success() {
 cleanup_deployment() {
     clean_info "🧹 Cleaning up existing Falcon deployment..."
 
-    # Find and remove ALL falcon-platform releases in ANY namespace
-    clean_info "Searching for falcon-platform releases across all namespaces..."
+    # Find and remove ALL falcon-related releases in ANY namespace
+    clean_info "Searching for all Falcon-related releases across all namespaces..."
     local releases_found=false
 
-    # Get all releases and filter for falcon-platform
+    # Get all releases and filter for any falcon-related ones
     while IFS= read -r release_line; do
-        if [[ -n "$release_line" && "$release_line" == *"falcon-platform"* ]]; then
+        if [[ -n "$release_line" && ("$release_line" == *"falcon-platform"* || "$release_line" == *"falcon-kac"* || "$release_line" == *"falcon-sensor"* || "$release_line" == *"falcon-helm"* || "$release_line" == *"falcon-image-analyzer"*) ]]; then
             releases_found=true
             local release_name=$(echo "$release_line" | awk '{print $1}')
             local release_ns=$(echo "$release_line" | awk '{print $2}')
@@ -810,7 +798,7 @@ cleanup_deployment() {
     done < <(helm list -A 2>/dev/null || echo "")
 
     if [[ "$releases_found" == "false" ]]; then
-        clean_info "No falcon-platform releases found"
+        clean_info "No Falcon-related releases found"
     fi
 
     # Remove namespaces with timeout
