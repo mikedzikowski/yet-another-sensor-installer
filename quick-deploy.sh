@@ -423,12 +423,41 @@ EOF
 deploy_falcon() {
     print_section "FALCON PLATFORM DEPLOYMENT"
 
-    # Check if release already exists
-    if helm list -n falcon-platform | grep -q "falcon-platform"; then
-        clean_info "Existing falcon-platform release found"
-        [[ "$VERBOSE" == "true" ]] && clean_info "Performing upgrade instead of fresh install"
-        local helm_operation="upgrade"
+    # Check if release already exists with more robust detection
+    local existing_release=""
 
+    # First check if falcon-platform namespace exists
+    if kubectl get namespace falcon-platform >/dev/null 2>&1; then
+        # Check for existing helm release in any namespace
+        existing_release=$(helm list -A -q | grep "^falcon-platform$" || echo "")
+
+        if [[ -n "$existing_release" ]]; then
+            # Get the namespace of the existing release
+            local release_namespace=$(helm list -A | grep "falcon-platform" | awk '{print $2}')
+            clean_info "Existing falcon-platform release found in namespace: $release_namespace"
+            [[ "$VERBOSE" == "true" ]] && clean_info "Performing upgrade instead of fresh install"
+            local helm_operation="upgrade"
+
+            # Ensure we're using the correct namespace for upgrade
+            local target_namespace="falcon-platform"
+            if [[ "$release_namespace" != "$target_namespace" ]]; then
+                clean_info "Release is in $release_namespace, will upgrade there"
+                target_namespace="$release_namespace"
+            fi
+        else
+            clean_info "falcon-platform namespace exists but no helm release found"
+            clean_info "This might be from a partial install - proceeding with fresh install"
+            local helm_operation="install"
+            local target_namespace="falcon-platform"
+        fi
+    else
+        clean_info "Installing new falcon-platform release..."
+        local helm_operation="install"
+        local target_namespace="falcon-platform"
+    fi
+
+    # Show current deployment state if upgrading
+    if [[ "$helm_operation" == "upgrade" ]]; then
         # Detect currently deployed components by checking for actual running pods
         local existing_sensor=$(kubectl get pods -n falcon-system -l app.kubernetes.io/name=falcon-sensor >/dev/null 2>&1 && echo "true" || echo "false")
         local existing_kac=$(kubectl get pods -n falcon-kac -l app.kubernetes.io/name=falcon-kac >/dev/null 2>&1 && echo "true" || echo "false")
@@ -438,37 +467,38 @@ deploy_falcon() {
         [[ "$existing_sensor" == "true" ]] && clean_info "Falcon Sensor: Currently deployed" || clean_info "Falcon Sensor: Not deployed"
         [[ "$existing_kac" == "true" ]] && clean_info "Falcon KAC: Currently deployed" || clean_info "Falcon KAC: Not deployed"
         [[ "$existing_iar" == "true" ]] && clean_info "Falcon IAR: Currently deployed" || clean_info "Falcon IAR: Not deployed"
+    fi
 
-        # Create component namespaces for NEW components being enabled (if namespaces don't exist)
-        if [[ "$INSTALL_SENSOR" == "true" ]]; then
-            if ! kubectl get namespace falcon-system >/dev/null 2>&1; then
-                clean_info "Creating falcon-system namespace for Sensor deployment..."
-                kubectl create namespace falcon-system
-            fi
+    # Create component namespaces for NEW components being enabled (if namespaces don't exist)
+    if [[ "$INSTALL_SENSOR" == "true" ]]; then
+        if ! kubectl get namespace falcon-system >/dev/null 2>&1; then
+            clean_info "Creating falcon-system namespace for Sensor deployment..."
+            kubectl create namespace falcon-system
         fi
-        if [[ "$INSTALL_KAC" == "true" ]]; then
-            if ! kubectl get namespace falcon-kac >/dev/null 2>&1; then
-                clean_info "Creating falcon-kac namespace for KAC deployment..."
-                kubectl create namespace falcon-kac
-            fi
+    fi
+    if [[ "$INSTALL_KAC" == "true" ]]; then
+        if ! kubectl get namespace falcon-kac >/dev/null 2>&1; then
+            clean_info "Creating falcon-kac namespace for KAC deployment..."
+            kubectl create namespace falcon-kac
         fi
-        if [[ "$INSTALL_IAR" == "true" ]]; then
-            if ! kubectl get namespace falcon-image-analyzer >/dev/null 2>&1; then
-                clean_info "Creating falcon-image-analyzer namespace for IAR deployment..."
-                kubectl create namespace falcon-image-analyzer
-            fi
+    fi
+    if [[ "$INSTALL_IAR" == "true" ]]; then
+        if ! kubectl get namespace falcon-image-analyzer >/dev/null 2>&1; then
+            clean_info "Creating falcon-image-analyzer namespace for IAR deployment..."
+            kubectl create namespace falcon-image-analyzer
         fi
+    fi
 
-        # Use helm upgrade with complete configuration (no reuse-values to avoid conflicts)
-        local helm_cmd="helm upgrade --install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
-            --namespace falcon-platform \
+    # Build helm command based on operation type
+    local helm_cmd=""
+    if [[ "$helm_operation" == "upgrade" ]]; then
+        helm_cmd="helm upgrade --install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
+            --namespace $target_namespace \
             --set global.falcon.cid=$FALCON_CID \
             --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG"
     else
-        clean_info "Installing new falcon-platform release..."
-        local helm_operation="install"
-        local helm_cmd="helm install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
-            --namespace falcon-platform \
+        helm_cmd="helm install falcon-platform crowdstrike/falcon-platform --version 1.2.0 \
+            --namespace $target_namespace \
             --create-namespace \
             --set createComponentNamespaces=true \
             --set global.falcon.cid=$FALCON_CID \
@@ -584,8 +614,8 @@ verify_deployment() {
     clean_info "Deployment Status:"
     echo "==================="
 
-    # Show helm release
-    helm list -n falcon-platform
+    # Show helm release using the correct namespace
+    helm list -n ${target_namespace:-falcon-platform}
     echo
 
     # Show pods across all falcon namespaces
@@ -626,6 +656,28 @@ print_success() {
     echo "For troubleshooting, visit: https://github.com/CrowdStrike/falcon-helm"
 }
 
+# Cleanup function for stuck deployments
+cleanup_deployment() {
+    clean_info "🧹 Cleaning up existing Falcon deployment..."
+
+    # Remove Helm release
+    helm uninstall falcon-platform -n falcon-platform --ignore-not-found 2>/dev/null || {
+        # Try finding release in any namespace
+        local release_ns=$(helm list -A | grep falcon-platform | awk '{print $2}' | head -n1)
+        if [[ -n "$release_ns" ]]; then
+            helm uninstall falcon-platform -n "$release_ns" --ignore-not-found
+        fi
+    }
+
+    # Remove namespaces
+    kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer --ignore-not-found --timeout=30s
+
+    # Remove ValidatingWebhookConfigurations
+    kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=falcon-platform --ignore-not-found
+
+    clean_success "Cleanup completed"
+}
+
 # Cleanup function
 cleanup() {
     if [[ -f "falcon-container-sensor-pull.sh" ]]; then
@@ -655,6 +707,12 @@ main() {
 
 # Trap errors and cleanup
 trap 'clean_error "Script failed at line $LINENO"; cleanup' ERR
+
+# Check for cleanup argument
+if [[ "$1" == "cleanup" || "$1" == "--cleanup" ]]; then
+    cleanup_deployment
+    exit 0
+fi
 
 # Run main function
 main "$@"
