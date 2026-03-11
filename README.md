@@ -77,6 +77,10 @@ export CLUSTERNAME="gke-auto-pilot" && \
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
+> **GKE Autopilot Note**: The script automatically creates an `AllowlistSynchronizer` resource that grants CrowdStrike workloads the necessary permissions to run security operations on GKE Autopilot clusters. This is required due to Autopilot's restrictive security policies.
+>
+> For more details, see: [GKE Autopilot Security Policies](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-security)
+
 ## 🔧 Configuration Options
 
 ### Component Selection
