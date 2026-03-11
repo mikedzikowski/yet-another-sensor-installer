@@ -159,27 +159,33 @@ validate_environment() {
 install_helm() {
     clean_info "Helm not found. Installing Helm automatically..."
 
-    # Create local bin directory
-    mkdir -p "$HOME/bin"
+    # Download the Helm installer script
+    local helm_script="get_helm.sh"
+    if curl -fsSL -o "$helm_script" https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4; then
+        chmod 700 "$helm_script"
 
-    # Download and install Helm
-    local helm_url="https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3"
-    if curl -fsSL "$helm_url" | bash; then
-        # Add to PATH for current session
-        export PATH="$HOME/bin:$PATH"
+        if ./"$helm_script"; then
+            # Clean up the installer script
+            rm -f "$helm_script"
 
-        # Add to bashrc for future sessions
-        if ! grep -q 'export PATH="$HOME/bin:$PATH"' "$HOME/.bashrc" 2>/dev/null; then
-            echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bashrc"
+            clean_success "Helm installed successfully"
+            clean_info "Location: $(which helm)"
+            clean_info "Version: $(helm version --short 2>/dev/null || helm version | head -n1)"
+        else
+            clean_error "Failed to install Helm using installer script"
+            rm -f "$helm_script"
+            clean_info "Please install Helm manually:"
+            clean_info "  curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4"
+            clean_info "  chmod 700 get_helm.sh"
+            clean_info "  ./get_helm.sh"
+            exit 1
         fi
-
-        clean_success "Helm installed successfully"
-        clean_info "Location: $(which helm)"
-        clean_info "Version: $(helm version --short 2>/dev/null || helm version | head -n1)"
     else
-        clean_error "Failed to install Helm automatically"
+        clean_error "Failed to download Helm installer script"
         clean_info "Please install Helm manually:"
-        clean_info "  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
+        clean_info "  curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4"
+        clean_info "  chmod 700 get_helm.sh"
+        clean_info "  ./get_helm.sh"
         exit 1
     fi
 }
