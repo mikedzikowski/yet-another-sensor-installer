@@ -215,110 +215,155 @@ download_falcon_script() {
 # Get Falcon configuration using the official script
 get_falcon_configuration() {
     print_section "FALCON CONFIGURATION"
-    log_info "Retrieving Falcon configuration..."
+
+    if [[ "$VERBOSE" == "true" ]]; then
+        log_info "Retrieving Falcon API configuration..."
+        log_info "   Using Client ID: ${FALCON_CLIENT_ID:0:8}..."
+        log_info "   Detecting Falcon cloud region..."
+    fi
 
     # Step 1: Get Falcon CID
+    if [[ "$VERBOSE" == "true" ]]; then
+        log_info "Fetching Customer ID (CID)..."
+    fi
     if ! FALCON_CID=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-cid 2>/dev/null); then
         log_error "Failed to retrieve Falcon CID"
-        echo "Please verify your FALCON_CLIENT_ID and FALCON_CLIENT_SECRET are correct"
+        echo "   Verify FALCON_CLIENT_ID and FALCON_CLIENT_SECRET are correct"
+        [[ "$VERBOSE" == "true" ]] && echo "   API Error: Authentication may have failed"
         exit 1
     fi
     export FALCON_CID
+    [[ "$VERBOSE" == "true" ]] && log_success "   Customer ID: ${FALCON_CID:0:20}..."
 
     # Step 2: Get encoded Docker config pull token
+    if [[ "$VERBOSE" == "true" ]]; then
+        log_info "Generating container registry credentials..."
+    fi
     if ! ENCODED_DOCKER_CONFIG=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-pull-token 2>/dev/null); then
         log_error "Failed to retrieve Docker registry credentials"
+        [[ "$VERBOSE" == "true" ]] && echo "   API Error: Registry token generation failed"
         exit 1
     fi
     export ENCODED_DOCKER_CONFIG
+    [[ "$VERBOSE" == "true" ]] && log_success "   Registry credentials generated (${#ENCODED_DOCKER_CONFIG} chars)"
 
-    # Step 3: Get Falcon Sensor image configuration (always fetch for potential use)
+    # Step 3: Get Falcon Sensor image configuration
+    if [[ "$VERBOSE" == "true" ]]; then
+        log_info "Retrieving Falcon Sensor image information..."
+    fi
     if ! FALCON_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon Sensor image path"
+        [[ "$VERBOSE" == "true" ]] && echo "   API Error: Sensor image metadata unavailable"
         exit 1
     fi
     export SENSOR_REGISTRY=$(echo $FALCON_IMAGE_FULL_PATH | cut -d':' -f 1)
     export SENSOR_IMAGE_TAG=$(echo $FALCON_IMAGE_FULL_PATH | cut -d':' -f 2)
+    [[ "$VERBOSE" == "true" ]] && log_success "   Sensor Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
 
-    # Step 4: Get Falcon KAC image configuration (always fetch for potential use)
+    # Step 4: Get Falcon KAC image configuration
+    if [[ "$VERBOSE" == "true" ]]; then
+        log_info "Retrieving Falcon KAC image information..."
+    fi
     if ! FALCON_KAC_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-kac --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon KAC image path"
+        [[ "$VERBOSE" == "true" ]] && echo "   API Error: KAC image metadata unavailable"
         exit 1
     fi
     export KAC_REGISTRY=$(echo $FALCON_KAC_IMAGE_FULL_PATH | cut -d':' -f 1)
     export KAC_IMAGE_TAG=$(echo $FALCON_KAC_IMAGE_FULL_PATH | cut -d':' -f 2)
+    [[ "$VERBOSE" == "true" ]] && log_success "   KAC Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
 
-    # Step 5: Get Falcon Image Analyzer configuration (always fetch for potential use)
+    # Step 5: Get Falcon Image Analyzer configuration
+    if [[ "$VERBOSE" == "true" ]]; then
+        log_info "Retrieving Falcon Image Analyzer information..."
+    fi
     if ! FALCON_IAR_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-imageanalyzer --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon Image Analyzer image path"
+        [[ "$VERBOSE" == "true" ]] && echo "   API Error: Image Analyzer metadata unavailable"
         exit 1
     fi
     export IAR_REGISTRY=$(echo $FALCON_IAR_IMAGE_FULL_PATH | cut -d':' -f 1)
     export IAR_IMAGE_TAG=$(echo $FALCON_IAR_IMAGE_FULL_PATH | cut -d':' -f 2)
+    [[ "$VERBOSE" == "true" ]] && log_success "   IAR Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
 
-    log_success "Configuration retrieved successfully"
+    log_success "Falcon configuration retrieved"
+    if [[ "$VERBOSE" == "true" ]]; then
+        log_info "   ✓ Customer ID acquired"
+        log_info "   ✓ Registry access configured"
+        log_info "   ✓ All component images resolved"
+    fi
 }
 
 # Display configuration summary
 show_configuration() {
-    echo
-    log_info "Configuration Summary:"
-    echo "=========================================="
-    echo "FALCON_CID: $FALCON_CID"
-    echo "ENCODED_DOCKER_CONFIG: ${ENCODED_DOCKER_CONFIG:0:50}..." # Show only first 50 chars
-    echo ""
+    print_section "DEPLOYMENT CONFIGURATION"
 
-    echo "Selected Components:"
+    log_info "Customer configuration:"
+    echo "   CID: $FALCON_CID"
+    echo "   Cluster: $CLUSTERNAME"
+    if [[ "$VERBOSE" == "true" ]]; then
+        echo "   Registry token: ${#ENCODED_DOCKER_CONFIG} characters"
+        echo "   Client ID: ${FALCON_CLIENT_ID:0:12}..."
+    fi
+
+    echo
+    log_info "Selected components:"
     if [[ "$INSTALL_SENSOR" == "true" ]]; then
-        echo "  ✅ Falcon Sensor - Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
+        log_success "   ✅ Falcon Sensor"
+        [[ "$VERBOSE" == "true" ]] && echo "      Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
     else
-        echo "  ❌ Falcon Sensor (disabled)"
+        log_warning "   ❌ Falcon Sensor (disabled)"
     fi
 
     if [[ "$INSTALL_KAC" == "true" ]]; then
-        echo "  ✅ Falcon KAC - Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
+        log_success "   ✅ Falcon KAC"
+        [[ "$VERBOSE" == "true" ]] && echo "      Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
     else
-        echo "  ❌ Falcon KAC (disabled)"
+        log_warning "   ❌ Falcon KAC (disabled)"
     fi
 
     if [[ "$INSTALL_IAR" == "true" ]]; then
-        echo "  ✅ Falcon Image Analyzer - Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
+        log_success "   ✅ Falcon Image Analyzer"
+        [[ "$VERBOSE" == "true" ]] && echo "      Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
     else
-        echo "  ❌ Falcon Image Analyzer (disabled)"
+        log_warning "   ❌ Falcon Image Analyzer (disabled)"
     fi
 
-    echo ""
-    echo "Cluster Configuration:"
-    echo "  - Name: $CLUSTERNAME"
+    echo
+    log_info "Cluster configuration:"
     if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
-        echo "  - Type: GKE Autopilot ⚙️"
+        log_success "   ⚙️  GKE Autopilot mode"
     else
-        echo "  - Type: Standard Kubernetes"
+        log_info "   🖥️  Standard Kubernetes"
     fi
-    echo "=========================================="
 }
 
 # Add Helm repository
 add_helm_repo() {
-    log_info "Adding CrowdStrike Helm repository..."
+    print_section "HELM REPOSITORY"
 
     if [[ "$VERBOSE" == "true" ]]; then
+        log_info "Adding CrowdStrike Helm repository..."
         helm repo add crowdstrike https://crowdstrike.github.io/falcon-helm 2>/dev/null || {
             log_info "Repository already exists, updating..."
         }
+        log_info "Updating Helm repositories..."
         helm repo update
+        log_success "Helm repository configured"
+        helm repo list | grep crowdstrike
     else
         helm repo add crowdstrike https://crowdstrike.github.io/falcon-helm >/dev/null 2>&1 || {
             log_info "Repository already exists, updating..."
         }
         helm repo update >/dev/null 2>&1
+        log_success "Helm repository configured"
     fi
-    log_success "Helm repository added and updated"
 }
 
 # Configure GKE Autopilot if needed
 configure_gke_autopilot() {
     if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
+        print_section "GKE AUTOPILOT CONFIGURATION"
         log_info "Configuring GKE Autopilot AllowlistSynchronizer..."
 
         # Create AllowlistSynchronizer YAML
@@ -363,11 +408,12 @@ EOF
 
 # Deploy Falcon Platform
 deploy_falcon() {
-    log_info "Deploying Falcon Platform..."
+    print_section "FALCON PLATFORM DEPLOYMENT"
 
     # Check if release already exists
     if helm list -n falcon-platform | grep -q "falcon-platform"; then
-        log_info "Existing falcon-platform release found, upgrading..."
+        log_info "Existing falcon-platform release found"
+        [[ "$VERBOSE" == "true" ]] && log_info "   Performing upgrade instead of fresh install"
         local helm_operation="upgrade"
 
         # Detect currently deployed components by checking for actual running pods
