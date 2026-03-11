@@ -62,17 +62,8 @@ export CLUSTERNAME="your-cluster-name"                       # Any descriptive n
 
 ### One-Command Deployment
 
-#### Method 1: Interactive Prompts (Recommended)
-```bash
-export FALCON_CLIENT_ID="your-client-id" && \
-export FALCON_CLIENT_SECRET="your-client-secret" && \
-export CLUSTERNAME="your-cluster-name" && \
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh && \
-chmod +x quick-deploy.sh && \
-./quick-deploy.sh
-```
+The script uses environment variables for all configuration. Simply set the required variables and run:
 
-#### Method 2: Piped with Defaults (All Components)
 ```bash
 export FALCON_CLIENT_ID="your-client-id" && \
 export FALCON_CLIENT_SECRET="your-client-secret" && \
@@ -80,7 +71,8 @@ export CLUSTERNAME="your-cluster-name" && \
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
-#### Method 3: Piped with Custom Component Selection
+#### Custom Component Selection
+
 ```bash
 export FALCON_CLIENT_ID="your-client-id" && \
 export FALCON_CLIENT_SECRET="your-client-secret" && \
@@ -92,7 +84,16 @@ export IS_GKE_AUTOPILOT=false && \
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
-> **⚠️ Note**: Interactive prompts only work with Method 1 (downloaded script). Methods 2 & 3 use environment variables for component selection.
+#### Download and Run Locally
+
+```bash
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh && \
+chmod +x quick-deploy.sh && \
+export FALCON_CLIENT_ID="your-client-id" && \
+export FALCON_CLIENT_SECRET="your-client-secret" && \
+export CLUSTERNAME="your-cluster-name" && \
+./quick-deploy.sh
+```
 
 That's it! ✨
 
@@ -128,63 +129,87 @@ $ export CLUSTERNAME="my-k8s-cluster"
 $ curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 
 🛡️  CrowdStrike Falcon Simple Deployment
-========================================
+────────────────────────────────────────────────────────────────
 
-[WARNING] Script is running in non-interactive mode.
-[INFO] Detected piped execution. Using environment variables or defaults.
+────────────────────────────────────────────────────────────────
+🔧 COMPONENT CONFIGURATION
+────────────────────────────────────────────────────────────────
 
-[INFO] Final component selections:
-[SUCCESS] ✅ Falcon Sensor will be installed
-[SUCCESS] ✅ Falcon KAC will be installed
-[SUCCESS] ✅ Falcon Image Analyzer will be installed
-[INFO] Standard Kubernetes mode
+[INFO] Customization options:
+   export INSTALL_SENSOR=false    # disable Sensor
+   export INSTALL_KAC=false       # disable KAC
+   export INSTALL_IAR=false       # disable IAR
+   export IS_GKE_AUTOPILOT=true   # enable GKE Autopilot
+   export VERBOSE=true             # enable verbose output
 
-[INFO] Validating environment variables...
-[SUCCESS] All required environment variables are set
-[INFO] Using CLUSTERNAME: my-k8s-cluster
-[INFO] Using FALCON_CLIENT_ID: your-cli...
+[INFO] Selected components:
+[SUCCESS]    ✅ Falcon Sensor
+[SUCCESS]    ✅ Falcon KAC
+[SUCCESS]    ✅ Falcon Image Analyzer
 
-[INFO] Checking prerequisites...
-[SUCCESS] All prerequisites are installed
-[INFO] Downloading CrowdStrike falcon-container-sensor-pull.sh script...
-[SUCCESS] Downloaded and configured falcon-container-sensor-pull.sh
-[INFO] Retrieving Falcon configuration...
-[SUCCESS] Configuration retrieved successfully
+[INFO] Cluster type:
+[INFO]    🖥️  Standard Kubernetes
 
-[INFO] Configuration Summary:
-==========================================
-FALCON_CID: 01234567ABCDEF1234567890ABCDEF12-34
-ENCODED_DOCKER_CONFIG: eyJhdXRocyI6IHsgInJlZ2lzdHJ5LmNyb3dkc3RyaWtlLmNvbS...
+────────────────────────────────────────────────────────────────
+🔧 ENVIRONMENT VALIDATION
+────────────────────────────────────────────────────────────────
 
-Selected Components:
-  ✅ Falcon Sensor - Image: registry.crowdstrike.com/falcon-sensor/release/falcon-sensor:7.34.0-18708-1
-  ✅ Falcon KAC - Image: registry.crowdstrike.com/falcon-kac/release/falcon-kac:7.35.0-3302
-  ✅ Falcon Image Analyzer - Image: registry.crowdstrike.com/falcon-imageanalyzer/us-1/release/falcon-imageanalyzer:1.0.23
+[SUCCESS] Environment variables validated
+[INFO]    Cluster: my-k8s-cluster
+[INFO]    Client ID: your-cli...
 
-Cluster Configuration:
-  - Name: my-k8s-cluster
-  - Type: Standard Kubernetes
-==========================================
-[INFO] Adding CrowdStrike Helm repository...
-[SUCCESS] Helm repository added and updated
-[INFO] Deploying Falcon Platform...
+────────────────────────────────────────────────────────────────
+🔧 PREREQUISITES CHECK
+────────────────────────────────────────────────────────────────
+
+[SUCCESS] All prerequisites verified
+[INFO]    ✓ kubectl connected to cluster
+[INFO]    ✓ Helm 3.x available
+[INFO]    ✓ curl available
+
+────────────────────────────────────────────────────────────────
+🔧 FALCON SCRIPT DOWNLOAD
+────────────────────────────────────────────────────────────────
+
+[SUCCESS] Official CrowdStrike script downloaded
+
+────────────────────────────────────────────────────────────────
+🔧 FALCON CONFIGURATION
+────────────────────────────────────────────────────────────────
+
+[SUCCESS] Falcon configuration retrieved
+[INFO]    ✓ Customer ID acquired
+[INFO]    ✓ Registry access configured
+[INFO]    ✓ All component images resolved
+
+────────────────────────────────────────────────────────────────
+🔧 DEPLOYMENT CONFIGURATION
+────────────────────────────────────────────────────────────────
+
+[INFO] Customer configuration:
+   CID: 01234567ABCDEF1234567890ABCDEF12-34
+   Cluster: my-k8s-cluster
+
+[INFO] Selected components:
+[SUCCESS]    ✅ Falcon Sensor
+[SUCCESS]    ✅ Falcon KAC
+[SUCCESS]    ✅ Falcon Image Analyzer
+
+[INFO] Cluster configuration:
+[INFO]    🖥️  Standard Kubernetes
+
+────────────────────────────────────────────────────────────────
+🔧 HELM REPOSITORY
+────────────────────────────────────────────────────────────────
+
+[SUCCESS] Helm repository configured
+
+────────────────────────────────────────────────────────────────
+🔧 FALCON PLATFORM DEPLOYMENT
+────────────────────────────────────────────────────────────────
+
 [INFO] Deployment in progress.......... [Creating namespaces].......... [Pulling container images].......... ✓
 [SUCCESS] Falcon Platform deployed successfully!
-[INFO] Verifying deployment...
-[INFO] Waiting for pods to start.................... ✓
-
-[INFO] Deployment Status:
-===================
-NAME            NAMESPACE       REVISION        UPDATED                 STATUS          CHART                   APP VERSION
-falcon-platform falcon-platform 1               2026-03-10 20:26:53.226 deployed        falcon-platform-1.2.0
-
-Falcon Pods:
-falcon-image-analyzer   falcon-platform-falcon-image-analyzer-abc123-def45   1/1     Running             0               30s
-falcon-kac              falcon-kac-55694c97f9-xyz89                          3/3     Running             0               30s
-falcon-system           falcon-platform-falcon-sensor-node1                  1/1     Running             0               30s
-falcon-system           falcon-platform-falcon-sensor-node2                  1/1     Running             0               30s
-falcon-system           falcon-platform-falcon-sensor-node3                  1/1     Running             0               30s
-[SUCCESS] Initial verification complete!
 
 [SUCCESS] 🎉 CrowdStrike Falcon Platform has been successfully deployed!
 
@@ -328,158 +353,40 @@ kubectl delete namespace falcon-image-analyzer --ignore-not-found
 
 > **⚠️ Important**: Always perform complete cleanup in test environments to ensure clean slate for re-deployment testing.
 
-## 🧪 Testing the Enhanced Deployment Script
+## 🧪 Testing & Validation
 
-### Prerequisites for Testing
+### Test with Verbose Output
 
-1. **Clean Kubernetes cluster** (or cleaned up existing deployment using instructions above)
-2. **Valid CrowdStrike OAuth credentials** with required permissions
-3. **kubectl** and **helm** configured and working
-4. **Internet access** from cluster to CrowdStrike registry
+Enable detailed logging to see what's happening:
 
-### Test Scenarios
-
-The enhanced script now supports component selection and GKE Autopilot. Test the following scenarios:
-
-#### Test 1: All Components (Default Behavior)
 ```bash
+export VERBOSE=true
 export FALCON_CLIENT_ID="your-client-id"
 export FALCON_CLIENT_SECRET="your-client-secret"
-export CLUSTERNAME="test-all-components"
+export CLUSTERNAME="test-cluster"
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
-**User Responses**: Y, Y, Y, N (Sensor=Yes, KAC=Yes, IAR=Yes, GKE=No)
 
-**Expected Results**:
-- ✅ Falcon Sensor DaemonSet in `falcon-system` namespace
-- ✅ Falcon KAC Deployment in `falcon-kac` namespace
-- ✅ Falcon Image Analyzer Deployment in `falcon-image-analyzer` namespace
+Verbose mode shows:
+- API call details and responses
+- Image path resolution
+- Registry credential generation progress
+- Detailed error context when issues occur
 
-#### Test 2: Sensor Only
+### Component Selection Testing
+
+Test different component combinations:
+
 ```bash
-export FALCON_CLIENT_ID="your-client-id"
-export FALCON_CLIENT_SECRET="your-client-secret"
-export CLUSTERNAME="test-sensor-only"
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+# Sensor only
+export INSTALL_SENSOR=true INSTALL_KAC=false INSTALL_IAR=false
+
+# KAC and IAR only
+export INSTALL_SENSOR=false INSTALL_KAC=true INSTALL_IAR=true
+
+# All components (default)
+# No exports needed - script defaults to all enabled
 ```
-**User Responses**: Y, N, N, N (Sensor=Yes, KAC=No, IAR=No, GKE=No)
-
-**Expected Results**:
-- ✅ Only Falcon Sensor deployed
-- ❌ No KAC or IAR components
-- Only `falcon-system` namespace created
-
-#### Test 3: KAC + IAR (No Sensor)
-```bash
-export FALCON_CLIENT_ID="your-client-id"
-export FALCON_CLIENT_SECRET="your-client-secret"
-export CLUSTERNAME="test-kac-iar"
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
-```
-**User Responses**: N, Y, Y, N (Sensor=No, KAC=Yes, IAR=Yes, GKE=No)
-
-**Expected Results**:
-- ❌ No Sensor DaemonSet
-- ✅ Falcon KAC and IAR deployed
-- `falcon-kac` and `falcon-image-analyzer` namespaces created
-
-#### Test 4: GKE Autopilot Simulation
-```bash
-export FALCON_CLIENT_ID="your-client-id"
-export FALCON_CLIENT_SECRET="your-client-secret"
-export CLUSTERNAME="test-gke-autopilot"
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
-```
-**User Responses**: Y, Y, Y, Y (All components + GKE Autopilot=Yes)
-
-**Expected Results**:
-- ✅ All components deployed with GKE Autopilot configurations
-- ✅ AllowlistSynchronizer created (will show error on non-GKE clusters - this is expected)
-- Helm values include `--set falcon-sensor.node.gke.autopilot=true`
-
-### Testing Commands
-
-#### Pre-Test Cleanup
-```bash
-# Clean slate before each test
-helm uninstall falcon-platform -n falcon-platform --ignore-not-found
-kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer --ignore-not-found
-kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=falcon-platform --ignore-not-found
-kubectl delete allowlistsynchronizers crowdstrike-synchronizer --ignore-not-found
-```
-
-#### Validation Commands
-```bash
-# Check deployment status
-kubectl get pods -A | grep falcon
-
-# Verify Helm release
-helm list -n falcon-platform
-
-# Check namespaces created
-kubectl get namespaces | grep falcon
-
-# Validate component-specific resources
-kubectl get daemonsets -A | grep falcon      # Sensor
-kubectl get deployments -A | grep falcon     # KAC and IAR
-kubectl get validatingwebhookconfigurations | grep crowdstrike  # KAC webhook
-
-# (GKE Autopilot test) Check AllowlistSynchronizer
-kubectl get allowlistsynchronizers crowdstrike-synchronizer
-```
-
-### Expected Script Output
-
-The enhanced script provides visual feedback:
-
-```
-🛡️  CrowdStrike Falcon Simple Deployment
-========================================
-
-[INFO] Component Selection
-===============================================
-Choose which CrowdStrike components to install:
-
-Install Falcon Sensor (Node Protection)? [Y/n]: Y
-[SUCCESS] Falcon Sensor will be installed
-
-Install Falcon KAC (Kubernetes Admission Controller)? [Y/n]: Y
-[SUCCESS] Falcon KAC will be installed
-
-Install Falcon Image Analyzer (Container Scanning)? [Y/n]: N
-[WARNING] Falcon Image Analyzer will NOT be installed
-
-Is this a GKE Autopilot cluster? [y/N]: N
-
-[INFO] Configuration Summary:
-==========================================
-Selected Components:
-  ✅ Falcon Sensor - Image: registry.crowdstrike.com/falcon-sensor/release/falcon-sensor:x.x.x
-  ✅ Falcon KAC - Image: registry.crowdstrike.com/falcon-kac/release/falcon-kac:x.x.x
-  ❌ Falcon Image Analyzer (disabled)
-
-Cluster Configuration:
-  - Name: your-cluster-name
-  - Type: Standard Kubernetes
-==========================================
-```
-
-### Troubleshooting Test Issues
-
-#### Component Selection Not Working
-- Ensure you're using the latest script from the repository
-- Check that interactive prompts are supported in your environment
-
-#### GKE Autopilot Test Failures (Non-GKE)
-- AllowlistSynchronizer creation will fail on non-GKE clusters (expected)
-- The script should continue and deploy other components successfully
-
-#### Validation Failures
-- Wait 1-2 minutes for pods to fully start
-- Check logs: `kubectl logs -n <namespace> <pod-name>`
-- Verify cluster resources are sufficient
-
-> **💡 Tip**: Test each scenario in sequence, cleaning up between tests to ensure accurate validation of component selection logic.
 
 ### Common Issues
 
