@@ -425,28 +425,34 @@ deploy_falcon() {
         log_info "Existing falcon-platform release found, upgrading..."
         local helm_operation="upgrade"
 
-        # Detect currently deployed components by checking existing namespaces
-        local existing_sensor=$(kubectl get namespace falcon-system >/dev/null 2>&1 && echo "true" || echo "false")
-        local existing_kac=$(kubectl get namespace falcon-kac >/dev/null 2>&1 && echo "true" || echo "false")
-        local existing_iar=$(kubectl get namespace falcon-image-analyzer >/dev/null 2>&1 && echo "true" || echo "false")
+        # Detect currently deployed components by checking for actual running pods
+        local existing_sensor=$(kubectl get pods -n falcon-system -l app.kubernetes.io/name=falcon-sensor >/dev/null 2>&1 && echo "true" || echo "false")
+        local existing_kac=$(kubectl get pods -n falcon-kac -l app.kubernetes.io/name=falcon-kac >/dev/null 2>&1 && echo "true" || echo "false")
+        local existing_iar=$(kubectl get pods -n falcon-image-analyzer -l app.kubernetes.io/name=falcon-image-analyzer >/dev/null 2>&1 && echo "true" || echo "false")
 
         log_info "Current deployment state:"
         [[ "$existing_sensor" == "true" ]] && log_info "  - Falcon Sensor: Currently deployed" || log_info "  - Falcon Sensor: Not deployed"
         [[ "$existing_kac" == "true" ]] && log_info "  - Falcon KAC: Currently deployed" || log_info "  - Falcon KAC: Not deployed"
         [[ "$existing_iar" == "true" ]] && log_info "  - Falcon IAR: Currently deployed" || log_info "  - Falcon IAR: Not deployed"
 
-        # Create component namespaces for NEW components being enabled
-        if [[ "$INSTALL_SENSOR" == "true" && "$existing_sensor" == "false" ]]; then
-            log_info "Creating falcon-system namespace for new Sensor deployment..."
-            kubectl create namespace falcon-system
+        # Create component namespaces for NEW components being enabled (if namespaces don't exist)
+        if [[ "$INSTALL_SENSOR" == "true" ]]; then
+            if ! kubectl get namespace falcon-system >/dev/null 2>&1; then
+                log_info "Creating falcon-system namespace for Sensor deployment..."
+                kubectl create namespace falcon-system
+            fi
         fi
-        if [[ "$INSTALL_KAC" == "true" && "$existing_kac" == "false" ]]; then
-            log_info "Creating falcon-kac namespace for new KAC deployment..."
-            kubectl create namespace falcon-kac
+        if [[ "$INSTALL_KAC" == "true" ]]; then
+            if ! kubectl get namespace falcon-kac >/dev/null 2>&1; then
+                log_info "Creating falcon-kac namespace for KAC deployment..."
+                kubectl create namespace falcon-kac
+            fi
         fi
-        if [[ "$INSTALL_IAR" == "true" && "$existing_iar" == "false" ]]; then
-            log_info "Creating falcon-image-analyzer namespace for new IAR deployment..."
-            kubectl create namespace falcon-image-analyzer
+        if [[ "$INSTALL_IAR" == "true" ]]; then
+            if ! kubectl get namespace falcon-image-analyzer >/dev/null 2>&1; then
+                log_info "Creating falcon-image-analyzer namespace for IAR deployment..."
+                kubectl create namespace falcon-image-analyzer
+            fi
         fi
 
         # Use helm upgrade with complete configuration (no reuse-values to avoid conflicts)
