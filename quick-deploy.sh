@@ -498,9 +498,40 @@ EOF
     fi
 }
 
+# Check for conflicting resources that could block deployment
+check_conflicting_resources() {
+    clean_info "Checking for conflicting resources..."
+
+    # Check for conflicting ValidatingWebhookConfigurations
+    local conflicting_webhooks=$(kubectl get validatingwebhookconfigurations -o jsonpath='{.items[?(@.metadata.name=="validating.falcon-kac.crowdstrike.com")].metadata.name}' 2>/dev/null || echo "")
+
+    if [[ -n "$conflicting_webhooks" ]]; then
+        clean_warning "Found conflicting webhook configuration: $conflicting_webhooks"
+        clean_info "This is from a previous Falcon KAC installation"
+        clean_info "Removing conflicting webhook..."
+
+        kubectl delete validatingwebhookconfigurations validating.falcon-kac.crowdstrike.com --ignore-not-found 2>/dev/null || true
+
+        # Wait a moment for deletion to complete
+        sleep 2
+
+        # Verify removal
+        if kubectl get validatingwebhookconfigurations validating.falcon-kac.crowdstrike.com 2>/dev/null; then
+            clean_error "Failed to remove conflicting webhook configuration"
+            clean_info "Please run cleanup first: ./quick-deploy.sh cleanup"
+            exit 1
+        else
+            clean_success "Conflicting webhook removed successfully"
+        fi
+    fi
+}
+
 # Deploy Falcon Platform
 deploy_falcon() {
     print_section "FALCON PLATFORM DEPLOYMENT"
+
+    # Check for and resolve conflicting resources first
+    check_conflicting_resources
 
     # Check if release already exists with comprehensive detection
     local existing_release=""
@@ -788,9 +819,26 @@ cleanup_deployment() {
         clean_warning "Some namespaces may take longer to delete (stuck finalizers)"
     }
 
-    # Remove ValidatingWebhookConfigurations
+    # Remove ValidatingWebhookConfigurations (multiple methods for thoroughness)
     clean_info "Removing webhook configurations..."
+
+    # Method 1: Remove by label
     kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=falcon-platform --ignore-not-found 2>/dev/null || true
+
+    # Method 2: Remove by name patterns (covers individual component installs)
+    kubectl delete validatingwebhookconfigurations \
+        validating.falcon-kac.crowdstrike.com \
+        falcon-kac-validating-webhook \
+        --ignore-not-found 2>/dev/null || true
+
+    # Method 3: Find and remove any CrowdStrike-related webhooks
+    local crowdstrike_webhooks=$(kubectl get validatingwebhookconfigurations -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | grep -i crowdstrike || echo "")
+    if [[ -n "$crowdstrike_webhooks" ]]; then
+        for webhook in $crowdstrike_webhooks; do
+            clean_info "Removing webhook: $webhook"
+            kubectl delete validatingwebhookconfigurations "$webhook" --ignore-not-found 2>/dev/null || true
+        done
+    fi
 
     # Additional cleanup for stuck resources
     clean_info "Cleaning up any remaining Falcon resources..."
