@@ -35,6 +35,12 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Clean logging functions without prefixes
+clean_info() { echo -e "${BLUE}$1${NC}"; }
+clean_success() { echo -e "${GREEN}$1${NC}"; }
+clean_warning() { echo -e "${YELLOW}$1${NC}"; }
+clean_error() { echo -e "${RED}$1${NC}"; }
+
 # Progress indicator function
 show_progress() {
     local message="$1"
@@ -89,7 +95,7 @@ check_root() {
 select_components() {
     print_section "COMPONENT CONFIGURATION"
 
-    log_info "Customization options:"
+    clean_info "Customization options:"
     echo "      export INSTALL_SENSOR=false    # disable Sensor"
     echo "      export INSTALL_KAC=false       # disable KAC"
     echo "      export INSTALL_IAR=false       # disable IAR"
@@ -104,14 +110,14 @@ select_components() {
     IS_GKE_AUTOPILOT="${IS_GKE_AUTOPILOT:-false}"
 
     # Log selections with better formatting
-    log_info "Selected components:"
-    [[ "$INSTALL_SENSOR" == "true" ]] && log_success "      ✅ Falcon Sensor" || log_warning "      ❌ Falcon Sensor"
-    [[ "$INSTALL_KAC" == "true" ]] && log_success "      ✅ Falcon KAC" || log_warning "      ❌ Falcon KAC"
-    [[ "$INSTALL_IAR" == "true" ]] && log_success "      ✅ Falcon Image Analyzer" || log_warning "      ❌ Falcon Image Analyzer"
+    clean_info "Selected components:"
+    [[ "$INSTALL_SENSOR" == "true" ]] && clean_success "      ✅ Falcon Sensor" || clean_warning "      ❌ Falcon Sensor"
+    [[ "$INSTALL_KAC" == "true" ]] && clean_success "      ✅ Falcon KAC" || clean_warning "      ❌ Falcon KAC"
+    [[ "$INSTALL_IAR" == "true" ]] && clean_success "      ✅ Falcon Image Analyzer" || clean_warning "      ❌ Falcon Image Analyzer"
 
     echo
-    log_info "Cluster type:"
-    [[ "$IS_GKE_AUTOPILOT" == "true" ]] && log_success "      ⚙️  GKE Autopilot" || log_info "      🖥️  Standard Kubernetes"
+    clean_info "Cluster type:"
+    [[ "$IS_GKE_AUTOPILOT" == "true" ]] && clean_success "      ⚙️  GKE Autopilot" || clean_info "      🖥️  Standard Kubernetes"
 
     # Validate at least one component is selected
     if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" ]]; then
@@ -152,9 +158,9 @@ validate_environment() {
         exit 1
     fi
 
-    log_success "Environment variables validated"
-    log_info "      Cluster: $CLUSTERNAME"
-    log_info "      Client ID: ${FALCON_CLIENT_ID:0:8}..."
+    clean_success "Environment variables validated"
+    clean_info "      Cluster: $CLUSTERNAME"
+    clean_info "      Client ID: ${FALCON_CLIENT_ID:0:8}..."
 }
 
 # Check prerequisites
@@ -193,10 +199,10 @@ check_prerequisites() {
         exit 1
     fi
 
-    log_success "All prerequisites verified"
-    log_info "      ✓ kubectl connected to cluster"
-    log_info "      ✓ Helm 3.x available"
-    log_info "      ✓ curl available"
+    clean_success "All prerequisites verified"
+    clean_info "      ✓ kubectl connected to cluster"
+    clean_info "      ✓ Helm 3.x available"
+    clean_info "      ✓ curl available"
 }
 
 # Download CrowdStrike falcon-container-sensor-pull.sh script
@@ -205,7 +211,7 @@ download_falcon_script() {
 
     if curl -sSL -o falcon-container-sensor-pull.sh "https://github.com/CrowdStrike/falcon-scripts/releases/latest/download/falcon-container-sensor-pull.sh"; then
         chmod +x falcon-container-sensor-pull.sh
-        log_success "Official CrowdStrike script downloaded"
+        clean_success "Official CrowdStrike script downloaded"
     else
         log_error "Failed to download falcon-container-sensor-pull.sh"
         exit 1
@@ -217,14 +223,14 @@ get_falcon_configuration() {
     print_section "FALCON CONFIGURATION"
 
     if [[ "$VERBOSE" == "true" ]]; then
-        log_info "Retrieving Falcon API configuration..."
-        log_info "      Using Client ID: ${FALCON_CLIENT_ID:0:8}..."
-        log_info "      Detecting Falcon cloud region..."
+        clean_info "Retrieving Falcon API configuration..."
+        clean_info "      Using Client ID: ${FALCON_CLIENT_ID:0:8}..."
+        clean_info "      Detecting Falcon cloud region..."
     fi
 
     # Step 1: Get Falcon CID
     if [[ "$VERBOSE" == "true" ]]; then
-        log_info "Fetching Customer ID (CID)..."
+        clean_info "Fetching Customer ID (CID)..."
     fi
     if ! FALCON_CID=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-cid 2>/dev/null); then
         log_error "Failed to retrieve Falcon CID"
@@ -233,11 +239,11 @@ get_falcon_configuration() {
         exit 1
     fi
     export FALCON_CID
-    [[ "$VERBOSE" == "true" ]] && log_success "      Customer ID: ${FALCON_CID:0:20}..."
+    [[ "$VERBOSE" == "true" ]] && clean_success "      Customer ID: ${FALCON_CID:0:20}..."
 
     # Step 2: Get encoded Docker config pull token
     if [[ "$VERBOSE" == "true" ]]; then
-        log_info "Generating container registry credentials..."
+        clean_info "Generating container registry credentials..."
     fi
     if ! ENCODED_DOCKER_CONFIG=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-pull-token 2>/dev/null); then
         log_error "Failed to retrieve Docker registry credentials"
@@ -245,11 +251,11 @@ get_falcon_configuration() {
         exit 1
     fi
     export ENCODED_DOCKER_CONFIG
-    [[ "$VERBOSE" == "true" ]] && log_success "      Registry credentials generated (${#ENCODED_DOCKER_CONFIG} chars)"
+    [[ "$VERBOSE" == "true" ]] && clean_success "      Registry credentials generated (${#ENCODED_DOCKER_CONFIG} chars)"
 
     # Step 3: Get Falcon Sensor image configuration
     if [[ "$VERBOSE" == "true" ]]; then
-        log_info "Retrieving Falcon Sensor image information..."
+        clean_info "Retrieving Falcon Sensor image information..."
     fi
     if ! FALCON_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon Sensor image path"
@@ -258,11 +264,11 @@ get_falcon_configuration() {
     fi
     export SENSOR_REGISTRY=$(echo $FALCON_IMAGE_FULL_PATH | cut -d':' -f 1)
     export SENSOR_IMAGE_TAG=$(echo $FALCON_IMAGE_FULL_PATH | cut -d':' -f 2)
-    [[ "$VERBOSE" == "true" ]] && log_success "      Sensor Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
+    [[ "$VERBOSE" == "true" ]] && clean_success "      Sensor Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
 
     # Step 4: Get Falcon KAC image configuration
     if [[ "$VERBOSE" == "true" ]]; then
-        log_info "Retrieving Falcon KAC image information..."
+        clean_info "Retrieving Falcon KAC image information..."
     fi
     if ! FALCON_KAC_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-kac --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon KAC image path"
@@ -271,11 +277,11 @@ get_falcon_configuration() {
     fi
     export KAC_REGISTRY=$(echo $FALCON_KAC_IMAGE_FULL_PATH | cut -d':' -f 1)
     export KAC_IMAGE_TAG=$(echo $FALCON_KAC_IMAGE_FULL_PATH | cut -d':' -f 2)
-    [[ "$VERBOSE" == "true" ]] && log_success "      KAC Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
+    [[ "$VERBOSE" == "true" ]] && clean_success "      KAC Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
 
     # Step 5: Get Falcon Image Analyzer configuration
     if [[ "$VERBOSE" == "true" ]]; then
-        log_info "Retrieving Falcon Image Analyzer information..."
+        clean_info "Retrieving Falcon Image Analyzer information..."
     fi
     if ! FALCON_IAR_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-imageanalyzer --get-image-path 2>/dev/null); then
         log_error "Failed to retrieve Falcon Image Analyzer image path"
@@ -284,13 +290,13 @@ get_falcon_configuration() {
     fi
     export IAR_REGISTRY=$(echo $FALCON_IAR_IMAGE_FULL_PATH | cut -d':' -f 1)
     export IAR_IMAGE_TAG=$(echo $FALCON_IAR_IMAGE_FULL_PATH | cut -d':' -f 2)
-    [[ "$VERBOSE" == "true" ]] && log_success "      IAR Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
+    [[ "$VERBOSE" == "true" ]] && clean_success "      IAR Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
 
-    log_success "Falcon configuration retrieved"
+    clean_success "Falcon configuration retrieved"
     if [[ "$VERBOSE" == "true" ]]; then
-        log_info "      ✓ Customer ID acquired"
-        log_info "      ✓ Registry access configured"
-        log_info "      ✓ All component images resolved"
+        clean_info "      ✓ Customer ID acquired"
+        clean_info "      ✓ Registry access configured"
+        clean_info "      ✓ All component images resolved"
     fi
 }
 
@@ -298,7 +304,7 @@ get_falcon_configuration() {
 show_configuration() {
     print_section "DEPLOYMENT CONFIGURATION"
 
-    log_info "Customer configuration:"
+    clean_info "Customer configuration:"
     echo "      CID: $FALCON_CID"
     echo "      Cluster: $CLUSTERNAME"
     if [[ "$VERBOSE" == "true" ]]; then
@@ -307,34 +313,34 @@ show_configuration() {
     fi
 
     echo
-    log_info "Selected components:"
+    clean_info "Selected components:"
     if [[ "$INSTALL_SENSOR" == "true" ]]; then
-        log_success "      ✅ Falcon Sensor"
+        clean_success "      ✅ Falcon Sensor"
         [[ "$VERBOSE" == "true" ]] && echo "         Image: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
     else
-        log_warning "      ❌ Falcon Sensor (disabled)"
+        clean_warning "      ❌ Falcon Sensor (disabled)"
     fi
 
     if [[ "$INSTALL_KAC" == "true" ]]; then
-        log_success "      ✅ Falcon KAC"
+        clean_success "      ✅ Falcon KAC"
         [[ "$VERBOSE" == "true" ]] && echo "         Image: $KAC_REGISTRY:$KAC_IMAGE_TAG"
     else
-        log_warning "      ❌ Falcon KAC (disabled)"
+        clean_warning "      ❌ Falcon KAC (disabled)"
     fi
 
     if [[ "$INSTALL_IAR" == "true" ]]; then
-        log_success "      ✅ Falcon Image Analyzer"
+        clean_success "      ✅ Falcon Image Analyzer"
         [[ "$VERBOSE" == "true" ]] && echo "         Image: $IAR_REGISTRY:$IAR_IMAGE_TAG"
     else
-        log_warning "      ❌ Falcon Image Analyzer (disabled)"
+        clean_warning "      ❌ Falcon Image Analyzer (disabled)"
     fi
 
     echo
-    log_info "Cluster configuration:"
+    clean_info "Cluster configuration:"
     if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
-        log_success "      ⚙️  GKE Autopilot mode"
+        clean_success "      ⚙️  GKE Autopilot mode"
     else
-        log_info "      🖥️  Standard Kubernetes"
+        clean_info "      🖥️  Standard Kubernetes"
     fi
 }
 
@@ -343,20 +349,20 @@ add_helm_repo() {
     print_section "HELM REPOSITORY"
 
     if [[ "$VERBOSE" == "true" ]]; then
-        log_info "Adding CrowdStrike Helm repository..."
+        clean_info "Adding CrowdStrike Helm repository..."
         helm repo add crowdstrike https://crowdstrike.github.io/falcon-helm 2>/dev/null || {
-            log_info "Repository already exists, updating..."
+            clean_info "Repository already exists, updating..."
         }
-        log_info "Updating Helm repositories..."
+        clean_info "Updating Helm repositories..."
         helm repo update
-        log_success "Helm repository configured"
+        clean_success "Helm repository configured"
         helm repo list | grep crowdstrike
     else
         helm repo add crowdstrike https://crowdstrike.github.io/falcon-helm >/dev/null 2>&1 || {
-            log_info "Repository already exists, updating..."
+            clean_info "Repository already exists, updating..."
         }
         helm repo update >/dev/null 2>&1
-        log_success "Helm repository configured"
+        clean_success "Helm repository configured"
     fi
 }
 

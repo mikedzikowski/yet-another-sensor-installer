@@ -135,68 +135,68 @@ $ curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployme
 🔧 COMPONENT CONFIGURATION
 ────────────────────────────────────────────────────────────────
 
-[INFO] Customization options:
+Customization options:
       export INSTALL_SENSOR=false    # disable Sensor
       export INSTALL_KAC=false       # disable KAC
       export INSTALL_IAR=false       # disable IAR
       export IS_GKE_AUTOPILOT=true   # enable GKE Autopilot
       export VERBOSE=true             # enable verbose output
 
-[INFO] Selected components:
-[SUCCESS]      ✅ Falcon Sensor
-[SUCCESS]      ✅ Falcon KAC
-[SUCCESS]      ✅ Falcon Image Analyzer
+Selected components:
+      ✅ Falcon Sensor
+      ✅ Falcon KAC
+      ✅ Falcon Image Analyzer
 
-[INFO] Cluster type:
-[INFO]      🖥️  Standard Kubernetes
+Cluster type:
+      🖥️  Standard Kubernetes
 
 ────────────────────────────────────────────────────────────────
 🔧 ENVIRONMENT VALIDATION
 ────────────────────────────────────────────────────────────────
 
-[SUCCESS] Environment variables validated
-[INFO]      Cluster: my-k8s-cluster
-[INFO]      Client ID: your-cli...
+Environment variables validated
+      Cluster: my-k8s-cluster
+      Client ID: your-cli...
 
 ────────────────────────────────────────────────────────────────
 🔧 PREREQUISITES CHECK
 ────────────────────────────────────────────────────────────────
 
-[SUCCESS] All prerequisites verified
-[INFO]      ✓ kubectl connected to cluster
-[INFO]      ✓ Helm 3.x available
-[INFO]      ✓ curl available
+All prerequisites verified
+      ✓ kubectl connected to cluster
+      ✓ Helm 3.x available
+      ✓ curl available
 
 ────────────────────────────────────────────────────────────────
 🔧 FALCON SCRIPT DOWNLOAD
 ────────────────────────────────────────────────────────────────
 
-[SUCCESS] Official CrowdStrike script downloaded
+Official CrowdStrike script downloaded
 
 ────────────────────────────────────────────────────────────────
 🔧 FALCON CONFIGURATION
 ────────────────────────────────────────────────────────────────
 
-[SUCCESS] Falcon configuration retrieved
-[INFO]      ✓ Customer ID acquired
-[INFO]      ✓ Registry access configured
-[INFO]      ✓ All component images resolved
+Falcon configuration retrieved
+      ✓ Customer ID acquired
+      ✓ Registry access configured
+      ✓ All component images resolved
 
 ────────────────────────────────────────────────────────────────
 🔧 DEPLOYMENT CONFIGURATION
 ────────────────────────────────────────────────────────────────
 
-[INFO] Customer configuration:
+Customer configuration:
       CID: 01234567ABCDEF1234567890ABCDEF12-34
       Cluster: my-k8s-cluster
 
-[INFO] Selected components:
-[SUCCESS]      ✅ Falcon Sensor
-[SUCCESS]      ✅ Falcon KAC
-[SUCCESS]      ✅ Falcon Image Analyzer
+Selected components:
+      ✅ Falcon Sensor
+      ✅ Falcon KAC
+      ✅ Falcon Image Analyzer
 
-[INFO] Cluster configuration:
-[INFO]      🖥️  Standard Kubernetes
+Cluster configuration:
+      🖥️  Standard Kubernetes
 
 ────────────────────────────────────────────────────────────────
 🔧 HELM REPOSITORY
