@@ -142,23 +142,6 @@ kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=fal
 kubectl delete allowlistsynchronizers crowdstrike-synchronizer --ignore-not-found
 ```
 
-### Force Delete Stuck Namespaces
-```bash
-# If namespaces are stuck in "Terminating" status
-kubectl get namespace falcon-system -o json | jq '.spec = {"finalizers":[]}' | kubectl replace --raw /api/v1/namespaces/falcon-system/finalize -f -
-kubectl get namespace falcon-kac -o json | jq '.spec = {"finalizers":[]}' | kubectl replace --raw /api/v1/namespaces/falcon-kac/finalize -f -
-kubectl get namespace falcon-image-analyzer -o json | jq '.spec = {"finalizers":[]}' | kubectl replace --raw /api/v1/namespaces/falcon-image-analyzer/finalize -f -
-```
-
-### Verification of Complete Cleanup
-```bash
-# Check no Falcon resources remain
-helm list -A | grep falcon
-kubectl get namespaces | grep falcon
-kubectl get pods -A | grep falcon
-kubectl get validatingwebhookconfigurations | grep crowdstrike
-```
-
 ## 📺 What the Script Does
 
 1. **Downloads** official CrowdStrike scripts
