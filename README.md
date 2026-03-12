@@ -43,7 +43,7 @@ export CLUSTERNAME="aks-standard" && \
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
-### EKS/EKS Fargate (Amazon Elastic Kubernetes Service)
+### EKS (Amazon Elastic Kubernetes Service)
 ```bash
 export FALCON_CLIENT_ID="your-falcon-oauth-client-id" && \
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret" && \
