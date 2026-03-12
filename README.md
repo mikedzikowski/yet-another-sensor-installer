@@ -126,21 +126,39 @@ falcon-system           falcon-platform-falcon-sensor-xxx            1/1     Run
 
 ## 🗑️ Cleanup Instructions
 
-### Complete Removal
+### Enhanced Complete Removal (Recommended)
 ```bash
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash -s cleanup
 ```
 
+The enhanced cleanup automatically removes:
+- ✅ **Falcon Platform umbrella chart** deployments
+- ✅ **Individual component releases** (falcon-sensor, falcon-kac, falcon-image-analyzer installed separately)
+- ✅ **Falcon Operator** installations and Custom Resource Definitions (CRDs)
+- ✅ **All namespaces** (falcon-platform, falcon-system, falcon-kac, falcon-image-analyzer, falcon-operator, crowdstrike-*)
+- ✅ **ValidatingWebhookConfigurations**
+- ✅ **AllowlistSynchronizers** (GKE Autopilot)
+- ✅ **Stuck resources** and finalizers
+
 ### Manual Cleanup (if automated cleanup fails)
 ```bash
-# Remove Helm release
+# Remove Helm releases (platform chart)
 helm uninstall falcon-platform -n falcon-platform
 
-# Delete namespaces
-kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer --ignore-not-found
+# Remove individual component releases (if they exist)
+helm uninstall falcon-sensor -n falcon-system --ignore-not-found
+helm uninstall falcon-kac -n falcon-kac --ignore-not-found
+helm uninstall falcon-image-analyzer -n falcon-image-analyzer --ignore-not-found
 
-# Clean up webhooks
+# Remove Falcon Operator (if installed)
+helm uninstall falcon-operator -n falcon-operator --ignore-not-found
+
+# Delete all Falcon namespaces
+kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer falcon-operator --ignore-not-found
+
+# Clean up webhooks and CRDs
 kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=falcon-platform --ignore-not-found
+kubectl delete crd $(kubectl get crd | grep -E "(falcon|crowdstrike)" | awk '{print $1}') --ignore-not-found
 
 # (GKE Autopilot only) Remove AllowlistSynchronizer
 kubectl delete allowlistsynchronizers crowdstrike-synchronizer --ignore-not-found

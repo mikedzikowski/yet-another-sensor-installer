@@ -826,6 +826,108 @@ cleanup_deployment() {
     clean_info "Cleaning up any remaining Falcon resources..."
     kubectl delete all,pvc,secrets,configmaps -l app.kubernetes.io/instance=falcon-platform --all-namespaces --ignore-not-found --timeout=30s 2>/dev/null || true
 
+    # ENHANCED: Clean up individual component releases (non-platform chart deployments)
+    clean_info "Scanning for individual Falcon component releases..."
+    local individual_components_found=false
+
+    # Check for individual component releases that bypass the platform chart
+    local individual_releases=$(helm list -A -a 2>/dev/null | grep -E "^(falcon-sensor|falcon-kac|falcon-image-analyzer)\s" || echo "")
+
+    if [[ -n "$individual_releases" ]]; then
+        individual_components_found=true
+        clean_warning "Found individual Falcon component releases (non-platform chart):"
+        echo "$individual_releases"
+
+        # Remove individual component releases
+        while IFS= read -r release_line; do
+            if [[ -n "$release_line" ]]; then
+                local comp_name=$(echo "$release_line" | awk '{print $1}')
+                local comp_ns=$(echo "$release_line" | awk '{print $2}')
+
+                clean_info "Removing individual component: '$comp_name' from namespace '$comp_ns'..."
+                helm uninstall "$comp_name" -n "$comp_ns" --ignore-not-found || {
+                    clean_warning "Failed to remove individual component $comp_name from $comp_ns"
+                }
+            fi
+        done <<< "$individual_releases"
+    fi
+
+    # ENHANCED: Clean up Falcon Operator deployments and CRDs
+    clean_info "Scanning for Falcon Operator installations..."
+    local operator_found=false
+
+    # Check for Falcon Operator Helm releases
+    local operator_releases=$(helm list -A -a 2>/dev/null | grep -E "(falcon-operator|crowdstrike-falcon-operator)" || echo "")
+    if [[ -n "$operator_releases" ]]; then
+        operator_found=true
+        clean_warning "Found Falcon Operator releases:"
+        echo "$operator_releases"
+
+        while IFS= read -r operator_line; do
+            if [[ -n "$operator_line" ]]; then
+                local op_name=$(echo "$operator_line" | awk '{print $1}')
+                local op_ns=$(echo "$operator_line" | awk '{print $2}')
+
+                clean_info "Removing Falcon Operator: '$op_name' from namespace '$op_ns'..."
+                helm uninstall "$op_name" -n "$op_ns" --ignore-not-found || {
+                    clean_warning "Failed to remove Falcon Operator $op_name from $op_ns"
+                }
+            fi
+        done <<< "$operator_releases"
+    fi
+
+    # Check for Falcon Operator CRDs
+    local falcon_crds=$(kubectl get crd 2>/dev/null | grep -E "(falcon|crowdstrike)" | awk '{print $1}' || echo "")
+    if [[ -n "$falcon_crds" ]]; then
+        operator_found=true
+        clean_warning "Found Falcon/CrowdStrike CRDs:"
+        echo "$falcon_crds"
+
+        clean_info "Removing Falcon/CrowdStrike CRDs..."
+        for crd in $falcon_crds; do
+            clean_info "Deleting CRD: $crd"
+            kubectl delete crd "$crd" --ignore-not-found --timeout=30s || {
+                clean_warning "Failed to delete CRD $crd (may have finalizers)"
+            }
+        done
+    fi
+
+    # Check for Falcon Operator workloads in common namespaces
+    local operator_workloads=$(kubectl get deployment,daemonset -A 2>/dev/null | grep -E "(falcon-operator|crowdstrike-falcon)" || echo "")
+    if [[ -n "$operator_workloads" ]]; then
+        operator_found=true
+        clean_warning "Found Falcon Operator workloads:"
+        echo "$operator_workloads"
+
+        clean_info "Removing Falcon Operator workloads..."
+        kubectl delete deployment,daemonset -A -l app.kubernetes.io/name=falcon-operator --ignore-not-found --timeout=30s 2>/dev/null || true
+        kubectl delete deployment,daemonset -A -l app=falcon-operator --ignore-not-found --timeout=30s 2>/dev/null || true
+    fi
+
+    # Check for Falcon Operator namespaces
+    local operator_namespaces=$(kubectl get namespace 2>/dev/null | grep -E "(falcon-operator|crowdstrike)" | awk '{print $1}' || echo "")
+    if [[ -n "$operator_namespaces" ]]; then
+        operator_found=true
+        clean_info "Removing Falcon Operator namespaces: $operator_namespaces"
+        for ns in $operator_namespaces; do
+            kubectl delete namespace "$ns" --ignore-not-found --timeout=60s || {
+                clean_warning "Namespace $ns may take longer to delete"
+            }
+        done
+    fi
+
+    # Summary of enhanced cleanup
+    if [[ "$individual_components_found" == "false" && "$operator_found" == "false" ]]; then
+        clean_success "No individual components or Falcon Operator installations found"
+    else
+        if [[ "$individual_components_found" == "true" ]]; then
+            clean_success "Individual Falcon component releases cleaned up"
+        fi
+        if [[ "$operator_found" == "true" ]]; then
+            clean_success "Falcon Operator installation cleaned up"
+        fi
+    fi
+
     clean_success "Cleanup completed"
     clean_info "You can now run the deployment again"
 }
