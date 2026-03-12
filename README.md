@@ -47,9 +47,36 @@ chmod +x quick-deploy.sh
 ./quick-deploy.sh
 ```
 
+**Non-interactive (automation):**
+```bash
+# Skip version selection prompts - uses latest versions
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="aks-production"
+export SKIP_VERSION_SELECTION=true
+
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+```
+
 ### EKS (Amazon Elastic Kubernetes Service)
 ```bash
-# EKS deployment with latest versions (automation-friendly)
+# EKS deployment with interactive version selection
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="eks-production"
+export INSTALL_SENSOR=true
+export INSTALL_KAC=true
+export INSTALL_IAR=true
+
+# Download and run with interactive prompts
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+chmod +x quick-deploy.sh
+./quick-deploy.sh
+```
+
+**Non-interactive (automation):**
+```bash
+# Skip version selection prompts - uses latest versions
 export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="eks-production"
@@ -60,7 +87,7 @@ curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment
 
 ### GKE Standard (Google Kubernetes Engine)
 ```bash
-# GKE Standard with custom component selection
+# GKE Standard with interactive version selection
 export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="gke-standard-prod"
@@ -68,12 +95,29 @@ export INSTALL_SENSOR=true    # Node protection
 export INSTALL_KAC=false      # Skip admission controller
 export INSTALL_IAR=true       # Include image analyzer
 
+# Download and run with interactive prompts
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+chmod +x quick-deploy.sh
+./quick-deploy.sh
+```
+
+**Non-interactive (automation):**
+```bash
+# Skip version selection prompts - uses latest versions
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="gke-standard-prod"
+export INSTALL_SENSOR=true
+export INSTALL_KAC=false
+export INSTALL_IAR=true
+export SKIP_VERSION_SELECTION=true
+
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
 ### GKE Autopilot 🤖
 ```bash
-# GKE Autopilot requires user mode (eBPF recommended)
+# GKE Autopilot with interactive version selection (eBPF recommended)
 export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="gke-autopilot-prod"
@@ -82,6 +126,22 @@ export FALCON_SENSOR_MODE=bpf  # RECOMMENDED for Autopilot
 export INSTALL_SENSOR=true
 export INSTALL_KAC=true
 export INSTALL_IAR=true
+
+# Download and run with interactive prompts
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+chmod +x quick-deploy.sh
+./quick-deploy.sh
+```
+
+**Non-interactive (automation):**
+```bash
+# Skip version selection prompts - uses latest versions
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="gke-autopilot-prod"
+export IS_GKE_AUTOPILOT=true
+export FALCON_SENSOR_MODE=bpf
+export SKIP_VERSION_SELECTION=true
 
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
@@ -118,7 +178,7 @@ The script automatically configures Autopilot-specific requirements:
 
 ### OpenShift / Security-Restricted Environment
 ```bash
-# For OpenShift or other security-restricted Kubernetes distributions
+# Interactive version selection for OpenShift or security-restricted Kubernetes
 export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="openshift-prod"
@@ -127,12 +187,27 @@ export INSTALL_SENSOR=true
 export INSTALL_KAC=true
 export INSTALL_IAR=true
 
+# Download and run with interactive prompts
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+chmod +x quick-deploy.sh
+./quick-deploy.sh
+```
+
+**Non-interactive (automation):**
+```bash
+# Skip version selection prompts - uses latest versions
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="openshift-prod"
+export FALCON_SENSOR_MODE=bpf
+export SKIP_VERSION_SELECTION=true
+
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
 ### Development/Testing Environment
 ```bash
-# Quick deployment with kernel mode for testing
+# Interactive deployment with kernel mode for testing
 export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="dev-cluster"
@@ -140,6 +215,24 @@ export FALCON_SENSOR_MODE=kernel  # Maximum visibility for testing
 export INSTALL_SENSOR=true
 export INSTALL_KAC=false  # Skip admission controller in dev
 export INSTALL_IAR=false  # Skip image analyzer in dev
+
+# Download and run with interactive prompts
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+chmod +x quick-deploy.sh
+./quick-deploy.sh
+```
+
+**Non-interactive (automation):**
+```bash
+# Skip version selection prompts - uses latest versions
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="dev-cluster"
+export FALCON_SENSOR_MODE=kernel
+export INSTALL_SENSOR=true
+export INSTALL_KAC=false
+export INSTALL_IAR=false
+export SKIP_VERSION_SELECTION=true
 
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
