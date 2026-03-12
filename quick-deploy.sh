@@ -119,6 +119,98 @@ select_components() {
     fi
 }
 
+# Image Version Selection Functions
+# =================================
+
+# List available image tags for a component
+list_component_tags() {
+    local component_type="$1"
+    local output_format="${2:-json}"
+
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "Fetching available tags for $component_type..."
+    fi
+
+    local tags_output=$(./falcon-container-sensor-pull.sh --type "$component_type" --list-tags 2>/dev/null)
+
+    if [[ $? -eq 0 && -n "$tags_output" ]]; then
+        if [[ "$output_format" == "json" ]]; then
+            echo "$tags_output"
+        elif [[ "$output_format" == "list" ]]; then
+            echo "$tags_output" | grep -o '"[^"]*"' | grep -E "^\"[0-9]" | tr -d '"' | head -20
+        fi
+    else
+        clean_error "Failed to retrieve tags for $component_type"
+        return 1
+    fi
+}
+
+# Show available versions for user selection
+show_available_versions() {
+    if [[ "$VERBOSE" == "true" ]] || [[ -n "$SHOW_VERSIONS" ]]; then
+        print_section "AVAILABLE IMAGE VERSIONS"
+
+        if [[ "$INSTALL_SENSOR" == "true" ]]; then
+            clean_info "Falcon Sensor versions:"
+            list_component_tags "falcon-sensor" "list" | sed 's/^/  /'
+            echo
+        fi
+
+        if [[ "$INSTALL_KAC" == "true" ]]; then
+            clean_info "Falcon KAC versions:"
+            list_component_tags "falcon-kac" "list" | sed 's/^/  /'
+            echo
+        fi
+
+        if [[ "$INSTALL_IAR" == "true" ]]; then
+            clean_info "Falcon Image Analyzer versions:"
+            list_component_tags "falcon-imageanalyzer" "list" | sed 's/^/  /'
+            echo
+        fi
+
+        clean_info "To use specific versions, set environment variables:"
+        echo "  export FALCON_SENSOR_VERSION=\"7.34.0-18708-1\""
+        echo "  export FALCON_KAC_VERSION=\"7.35.0-3302\""
+        echo "  export FALCON_IAR_VERSION=\"1.0.23\""
+        echo
+    fi
+}
+
+# Configure image versions (either custom or latest)
+configure_image_versions() {
+    print_section "IMAGE VERSION CONFIGURATION"
+
+    # Check for custom versions first
+    local using_custom_versions=false
+
+    if [[ -n "$FALCON_SENSOR_VERSION" ]]; then
+        using_custom_versions=true
+        export SENSOR_IMAGE_TAG="$FALCON_SENSOR_VERSION"
+        clean_info "Using custom Falcon Sensor version: $FALCON_SENSOR_VERSION"
+    fi
+
+    if [[ -n "$FALCON_KAC_VERSION" ]]; then
+        using_custom_versions=true
+        export KAC_IMAGE_TAG="$FALCON_KAC_VERSION"
+        clean_info "Using custom Falcon KAC version: $FALCON_KAC_VERSION"
+    fi
+
+    if [[ -n "$FALCON_IAR_VERSION" ]]; then
+        using_custom_versions=true
+        export IAR_IMAGE_TAG="$FALCON_IAR_VERSION"
+        clean_info "Using custom Falcon Image Analyzer version: $FALCON_IAR_VERSION"
+    fi
+
+    # If custom versions are specified, skip the API calls for those components
+    if [[ "$using_custom_versions" == "true" ]]; then
+        clean_success "Custom image versions configured"
+        return 0
+    else
+        clean_info "No custom versions specified - will use latest from API"
+        return 1
+    fi
+}
+
 # Validate required environment variables
 validate_environment() {
     print_section "ENVIRONMENT VALIDATION"
@@ -383,6 +475,70 @@ get_falcon_configuration() {
         clean_info "✓ Customer ID acquired"
         clean_info "✓ Registry access configured"
         clean_info "✓ All component images resolved"
+    fi
+}
+
+# Get minimal Falcon configuration when custom versions are specified
+get_falcon_configuration_minimal() {
+    print_section "FALCON CONFIGURATION (Custom Versions)"
+
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "Using custom image versions - retrieving CID and registry credentials..."
+        clean_info "Using Client ID: ${FALCON_CLIENT_ID:0:8}..."
+    fi
+
+    # Step 1: Get Falcon CID
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "Fetching Customer ID (CID)..."
+    fi
+    if ! FALCON_CID=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-cid 2>/dev/null); then
+        clean_error "Failed to retrieve Falcon CID"
+        echo "Verify FALCON_CLIENT_ID and FALCON_CLIENT_SECRET are correct"
+        [[ "$VERBOSE" == "true" ]] && echo "API Error: Authentication may have failed"
+        exit 1
+    fi
+    export FALCON_CID
+    [[ "$VERBOSE" == "true" ]] && clean_success "Customer ID: ${FALCON_CID:0:20}..."
+
+    # Step 2: Get encoded Docker config pull token
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "Generating container registry credentials..."
+    fi
+    if ! ENCODED_DOCKER_CONFIG=$(./falcon-container-sensor-pull.sh -t falcon-sensor --get-pull-token 2>/dev/null); then
+        clean_error "Failed to retrieve Docker registry credentials"
+        [[ "$VERBOSE" == "true" ]] && echo "API Error: Registry token generation failed"
+        exit 1
+    fi
+    export ENCODED_DOCKER_CONFIG
+    [[ "$VERBOSE" == "true" ]] && clean_success "Registry credentials generated (${#ENCODED_DOCKER_CONFIG} chars)"
+
+    # Set registry paths for custom versions (will be overridden with custom tags)
+    if [[ -n "$FALCON_SENSOR_VERSION" && "$INSTALL_SENSOR" == "true" ]]; then
+        export SENSOR_REGISTRY="registry.crowdstrike.com/falcon-sensor/release/falcon-sensor"
+        [[ "$VERBOSE" == "true" ]] && clean_success "Sensor: $SENSOR_REGISTRY:$SENSOR_IMAGE_TAG"
+    fi
+
+    if [[ -n "$FALCON_KAC_VERSION" && "$INSTALL_KAC" == "true" ]]; then
+        export KAC_REGISTRY="registry.crowdstrike.com/falcon-kac/release/falcon-kac"
+        [[ "$VERBOSE" == "true" ]] && clean_success "KAC: $KAC_REGISTRY:$KAC_IMAGE_TAG"
+    fi
+
+    if [[ -n "$FALCON_IAR_VERSION" && "$INSTALL_IAR" == "true" ]]; then
+        # IAR needs special handling for region detection
+        if ! FALCON_IAR_IMAGE_FULL_PATH=$(./falcon-container-sensor-pull.sh -t falcon-imageanalyzer --get-image-path 2>/dev/null); then
+            # Fallback to us-1 if detection fails
+            export IAR_REGISTRY="registry.crowdstrike.com/falcon-imageanalyzer/us-1/release/falcon-imageanalyzer"
+        else
+            export IAR_REGISTRY=$(echo $FALCON_IAR_IMAGE_FULL_PATH | cut -d':' -f 1)
+        fi
+        [[ "$VERBOSE" == "true" ]] && clean_success "IAR: $IAR_REGISTRY:$IAR_IMAGE_TAG"
+    fi
+
+    clean_success "Falcon configuration retrieved with custom versions"
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "✓ Customer ID acquired"
+        clean_info "✓ Registry access configured"
+        clean_info "✓ Custom image versions applied"
     fi
 }
 
@@ -950,7 +1106,19 @@ main() {
     validate_environment
     check_prerequisites
     download_falcon_script
-    get_falcon_configuration
+
+    # Show available versions if requested
+    show_available_versions
+
+    # Configure image versions (custom or latest from API)
+    if ! configure_image_versions; then
+        # No custom versions, get latest from API
+        get_falcon_configuration
+    else
+        # Custom versions specified, still need CID and registry config
+        get_falcon_configuration_minimal
+    fi
+
     show_configuration
     add_helm_repo
     configure_gke_autopilot
@@ -965,6 +1133,46 @@ trap 'clean_error "Script failed at line $LINENO"; cleanup' ERR
 # Check for cleanup argument
 if [[ "$1" == "cleanup" || "$1" == "--cleanup" ]]; then
     cleanup_deployment
+    exit 0
+fi
+
+# Check for list-versions argument
+if [[ "$1" == "list-versions" || "$1" == "--list-versions" ]]; then
+    export SHOW_VERSIONS=true
+    export VERBOSE=true
+    # Need credentials for API calls
+    if [[ -z "$FALCON_CLIENT_ID" || -z "$FALCON_CLIENT_SECRET" ]]; then
+        echo
+        echo "🛡️  CrowdStrike Falcon Available Image Versions"
+        print_separator
+        echo
+        clean_error "Missing required credentials for API access"
+        echo
+        echo "Set your credentials first:"
+        echo "  export FALCON_CLIENT_ID=\"your-client-id\""
+        echo "  export FALCON_CLIENT_SECRET=\"your-client-secret\""
+        echo
+        echo "Then run: $0 list-versions"
+        exit 1
+    fi
+
+    # Download the falcon script if needed
+    if [[ ! -f "falcon-container-sensor-pull.sh" ]]; then
+        curl -sSL -o falcon-container-sensor-pull.sh "https://github.com/CrowdStrike/falcon-scripts/releases/latest/download/falcon-container-sensor-pull.sh" >/dev/null 2>&1
+        chmod +x falcon-container-sensor-pull.sh
+    fi
+
+    # Show available versions
+    echo
+    echo "🛡️  CrowdStrike Falcon Available Image Versions"
+    print_separator
+    echo
+
+    # Set defaults for components to show all versions
+    INSTALL_SENSOR=true INSTALL_KAC=true INSTALL_IAR=true show_available_versions
+
+    # Clean up
+    rm -f falcon-container-sensor-pull.sh
     exit 0
 fi
 

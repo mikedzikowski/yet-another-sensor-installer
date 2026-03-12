@@ -102,6 +102,55 @@ export CLUSTERNAME="your-cluster-name"
 ./quick-deploy.sh
 ```
 
+## 🏷️ Image Version Selection
+
+### List Available Versions
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+./quick-deploy.sh list-versions
+```
+
+This shows all available image versions for each component:
+```
+Falcon Sensor versions:
+  7.31.0-18410-1
+  7.32.0-18504-1
+  7.33.0-18606-1
+  7.34.0-18708-1
+
+Falcon KAC versions:
+  7.33.0-3105
+  7.34.0-3201
+  7.35.0-3302
+
+Falcon Image Analyzer versions:
+  1.0.20
+  1.0.21
+  1.0.22
+  1.0.23
+```
+
+### Deploy with Specific Versions
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="your-cluster-name"
+
+# Specify custom image versions
+export FALCON_SENSOR_VERSION="7.33.0-18606-1"
+export FALCON_KAC_VERSION="7.34.0-3201"
+export FALCON_IAR_VERSION="1.0.22"
+
+./quick-deploy.sh
+```
+
+**Version Selection Options:**
+- **Latest (default)**: Script automatically uses newest available versions
+- **Custom versions**: Set environment variables for specific versions
+- **Mixed approach**: Specify versions only for some components, others use latest
+- **Version validation**: Script validates specified versions exist before deployment
+
 ## 🔍 Verification
 
 ### Check Deployment Status
