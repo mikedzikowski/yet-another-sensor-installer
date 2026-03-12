@@ -176,6 +176,141 @@ show_available_versions() {
     fi
 }
 
+# Interactive version selection for deployment
+interactive_version_selection() {
+    # Skip if environment variables are already set or if non-interactive (unless forced)
+    if [[ -n "$FALCON_SENSOR_VERSION" ]] || [[ -n "$FALCON_KAC_VERSION" ]] || [[ -n "$FALCON_IAR_VERSION" ]] || [[ "$SKIP_VERSION_SELECTION" == "true" ]]; then
+        return 0
+    fi
+
+    # Check if interactive (TTY) or forced interactive mode
+    if [[ ! -t 0 ]] && [[ "$FORCE_INTERACTIVE" != "true" ]]; then
+        clean_info "Non-interactive environment detected. Skipping version selection (using latest versions)"
+        clean_info "To force interactive mode, set: export FORCE_INTERACTIVE=true"
+        return 0
+    fi
+
+    print_section "INTERACTIVE VERSION SELECTION"
+
+    clean_info "🏷️  Fetching latest available image versions..."
+    echo
+
+    # Interactive selection for Falcon Sensor
+    if [[ "$INSTALL_SENSOR" == "true" ]]; then
+        clean_info "Falcon Sensor versions available:"
+        local sensor_versions=$(list_component_tags "falcon-sensor" "list" | head -10)
+        if [[ -n "$sensor_versions" ]]; then
+            echo "$sensor_versions" | nl -nln
+            echo
+            local sensor_choice
+            while true; do
+                echo -n "Select Falcon Sensor version (1-$(echo "$sensor_versions" | wc -l), or 'latest' for newest): "
+                read -r sensor_choice
+
+                if [[ "$sensor_choice" == "latest" ]]; then
+                    clean_info "Using latest Falcon Sensor version"
+                    break
+                elif [[ "$sensor_choice" =~ ^[0-9]+$ ]] && [[ "$sensor_choice" -ge 1 ]] && [[ "$sensor_choice" -le $(echo "$sensor_versions" | wc -l) ]]; then
+                    export FALCON_SENSOR_VERSION=$(echo "$sensor_versions" | sed -n "${sensor_choice}p")
+                    clean_success "Selected Falcon Sensor version: $FALCON_SENSOR_VERSION"
+                    break
+                else
+                    clean_error "Invalid selection. Please enter a number 1-$(echo "$sensor_versions" | wc -l) or 'latest'"
+                fi
+            done
+        else
+            clean_warning "Could not fetch Falcon Sensor versions, using latest"
+        fi
+        echo
+    fi
+
+    # Interactive selection for Falcon KAC
+    if [[ "$INSTALL_KAC" == "true" ]]; then
+        clean_info "Falcon KAC versions available:"
+        local kac_versions=$(list_component_tags "falcon-kac" "list" | head -10)
+        if [[ -n "$kac_versions" ]]; then
+            echo "$kac_versions" | nl -nln
+            echo
+            local kac_choice
+            while true; do
+                echo -n "Select Falcon KAC version (1-$(echo "$kac_versions" | wc -l), or 'latest' for newest): "
+                read -r kac_choice
+
+                if [[ "$kac_choice" == "latest" ]]; then
+                    clean_info "Using latest Falcon KAC version"
+                    break
+                elif [[ "$kac_choice" =~ ^[0-9]+$ ]] && [[ "$kac_choice" -ge 1 ]] && [[ "$kac_choice" -le $(echo "$kac_versions" | wc -l) ]]; then
+                    export FALCON_KAC_VERSION=$(echo "$kac_versions" | sed -n "${kac_choice}p")
+                    clean_success "Selected Falcon KAC version: $FALCON_KAC_VERSION"
+                    break
+                else
+                    clean_error "Invalid selection. Please enter a number 1-$(echo "$kac_versions" | wc -l) or 'latest'"
+                fi
+            done
+        else
+            clean_warning "Could not fetch Falcon KAC versions, using latest"
+        fi
+        echo
+    fi
+
+    # Interactive selection for Falcon Image Analyzer
+    if [[ "$INSTALL_IAR" == "true" ]]; then
+        clean_info "Falcon Image Analyzer versions available:"
+        local iar_versions=$(list_component_tags "falcon-imageanalyzer" "list" | head -10)
+        if [[ -n "$iar_versions" ]]; then
+            echo "$iar_versions" | nl -nln
+            echo
+            local iar_choice
+            while true; do
+                echo -n "Select Falcon Image Analyzer version (1-$(echo "$iar_versions" | wc -l), or 'latest' for newest): "
+                read -r iar_choice
+
+                if [[ "$iar_choice" == "latest" ]]; then
+                    clean_info "Using latest Falcon Image Analyzer version"
+                    break
+                elif [[ "$iar_choice" =~ ^[0-9]+$ ]] && [[ "$iar_choice" -ge 1 ]] && [[ "$iar_choice" -le $(echo "$iar_versions" | wc -l) ]]; then
+                    export FALCON_IAR_VERSION=$(echo "$iar_versions" | sed -n "${iar_choice}p")
+                    clean_success "Selected Falcon Image Analyzer version: $FALCON_IAR_VERSION"
+                    break
+                else
+                    clean_error "Invalid selection. Please enter a number 1-$(echo "$iar_versions" | wc -l) or 'latest'"
+                fi
+            done
+        else
+            clean_warning "Could not fetch Falcon Image Analyzer versions, using latest"
+        fi
+        echo
+    fi
+
+    # Summary of selections
+    if [[ -n "$FALCON_SENSOR_VERSION" ]] || [[ -n "$FALCON_KAC_VERSION" ]] || [[ -n "$FALCON_IAR_VERSION" ]]; then
+        clean_info "Version selections summary:"
+        [[ -n "$FALCON_SENSOR_VERSION" ]] && echo "  Sensor: $FALCON_SENSOR_VERSION" || echo "  Sensor: latest"
+        [[ -n "$FALCON_KAC_VERSION" ]] && echo "  KAC: $FALCON_KAC_VERSION" || echo "  KAC: latest"
+        [[ -n "$FALCON_IAR_VERSION" ]] && echo "  Image Analyzer: $FALCON_IAR_VERSION" || echo "  Image Analyzer: latest"
+        echo
+    fi
+
+    local proceed_choice
+    while true; do
+        echo -n "Proceed with these version selections? [Y/n]: "
+        read -r proceed_choice
+        case ${proceed_choice,,} in
+            ""|"y"|"yes")
+                clean_success "Proceeding with selected versions"
+                break
+                ;;
+            "n"|"no")
+                clean_info "Deployment cancelled by user"
+                exit 0
+                ;;
+            *)
+                clean_error "Please enter 'y' for yes or 'n' for no"
+                ;;
+        esac
+    done
+}
+
 # Configure image versions (either custom or latest)
 configure_image_versions() {
     print_section "IMAGE VERSION CONFIGURATION"
@@ -1106,6 +1241,9 @@ main() {
     validate_environment
     check_prerequisites
     download_falcon_script
+
+    # Interactive version selection (if TTY and no pre-set versions)
+    interactive_version_selection
 
     # Show available versions if requested
     show_available_versions
