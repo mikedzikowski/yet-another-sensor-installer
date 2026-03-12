@@ -539,12 +539,12 @@ deploy_falcon() {
     local helm_operation="install"
     local target_namespace="falcon-platform"
 
-    # Search for ANY Falcon-related releases across ALL namespaces
-    local falcon_releases=$(helm list -A -o json 2>/dev/null | jq -r '.[] | select(.name | test("falcon")) | "\(.name) \(.namespace)"' 2>/dev/null || echo "")
+    # Search for ANY Falcon-related releases across ALL namespaces (including failed ones)
+    local falcon_releases=$(helm list -A -a -o json 2>/dev/null | jq -r '.[] | select(.name | test("falcon")) | "\(.name) \(.namespace) \(.status)"' 2>/dev/null || echo "")
 
-    # Fallback if jq not available - search with grep
+    # Fallback if jq not available - search with grep (including failed releases)
     if [[ -z "$falcon_releases" ]]; then
-        falcon_releases=$(helm list -A 2>/dev/null | grep -E "(falcon-platform|falcon-kac|falcon-sensor|falcon-helm|falcon-image-analyzer)" || echo "")
+        falcon_releases=$(helm list -A -a 2>/dev/null | grep -E "(falcon-platform|falcon-kac|falcon-sensor|falcon-helm|falcon-image-analyzer)" || echo "")
     fi
 
     if [[ -n "$falcon_releases" ]]; then
@@ -807,7 +807,7 @@ cleanup_deployment() {
                 clean_warning "Failed to remove release $release_name from $release_ns"
             }
         fi
-    done < <(helm list -A 2>/dev/null || echo "")
+    done < <(helm list -A -a 2>/dev/null || echo "")
 
     if [[ "$releases_found" == "false" ]]; then
         clean_info "No Falcon-related releases found"
