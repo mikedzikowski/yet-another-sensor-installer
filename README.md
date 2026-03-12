@@ -29,6 +29,28 @@ Your Falcon OAuth client needs these permissions:
 
 Create OAuth client at [falcon.crowdstrike.com](https://falcon.crowdstrike.com) → **Support and resources** → **API Clients & Keys**
 
+## 🖥️ Interactive Mode
+
+**NEW**: Run the script without any environment variables for a guided, interactive experience:
+
+```bash
+# Download and run interactively
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+chmod +x quick-deploy.sh
+./quick-deploy.sh
+```
+
+The interactive mode will:
+- ✅ **Guide you through credential input** with secure password prompts
+- ✅ **Present component selection** with easy Y/n choices
+- ✅ **Detect cluster type** (Standard vs GKE Autopilot)
+- ✅ **Show deployment summary** before proceeding
+- ✅ **Automatically fall back** to environment variables if they're already set
+
+**Interactive vs Environment Variables**:
+- **Interactive**: No setup needed - just run the script and follow prompts
+- **Environment Variables**: Perfect for automation and CI/CD pipelines
+
 ## 📋 Cloud Platform Deployment Examples
 
 ### AKS (Azure Kubernetes Service)
@@ -83,7 +105,13 @@ curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment
 
 ## 🔧 Configuration Options
 
-### Component Selection
+### Interactive Mode (Recommended for First-Time Users)
+Run without environment variables for guided setup:
+```bash
+./quick-deploy.sh  # Will prompt for all required inputs
+```
+
+### Environment Variables (For Automation)
 ```bash
 export INSTALL_SENSOR=true     # Enable/disable Falcon Sensor
 export INSTALL_KAC=true        # Enable/disable Admission Controller
