@@ -597,25 +597,7 @@ deploy_falcon() {
         [[ "$existing_iar" == "true" ]] && clean_info "Falcon IAR: Currently deployed" || clean_info "Falcon IAR: Not deployed"
     fi
 
-    # Create component namespaces for NEW components being enabled (if namespaces don't exist)
-    if [[ "$INSTALL_SENSOR" == "true" ]]; then
-        if ! kubectl get namespace falcon-system >/dev/null 2>&1; then
-            clean_info "Creating falcon-system namespace for Sensor deployment..."
-            kubectl create namespace falcon-system
-        fi
-    fi
-    if [[ "$INSTALL_KAC" == "true" ]]; then
-        if ! kubectl get namespace falcon-kac >/dev/null 2>&1; then
-            clean_info "Creating falcon-kac namespace for KAC deployment..."
-            kubectl create namespace falcon-kac
-        fi
-    fi
-    if [[ "$INSTALL_IAR" == "true" ]]; then
-        if ! kubectl get namespace falcon-image-analyzer >/dev/null 2>&1; then
-            clean_info "Creating falcon-image-analyzer namespace for IAR deployment..."
-            kubectl create namespace falcon-image-analyzer
-        fi
-    fi
+    # Helm chart will handle namespace creation via createComponentNamespaces=true
 
     # Build helm command based on operation type
     local helm_cmd=""
