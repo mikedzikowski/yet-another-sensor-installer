@@ -176,6 +176,21 @@ export FALCON_SENSOR_MODE=bpf
 - **Features**: eBPF-based monitoring without kernel module
 - **Requirements**: Linux kernel 4.15+ with eBPF support
 
+### 🧹 Clear All Variables
+
+To start fresh and unset all CrowdStrike Falcon environment variables:
+
+```bash
+# Unset all CrowdStrike Falcon variables
+unset FALCON_CLIENT_ID FALCON_CLIENT_SECRET FALCON_CID CLUSTERNAME \
+      FALCON_SENSOR_VERSION FALCON_KAC_VERSION FALCON_IAR_VERSION \
+      SKIP_VERSION_SELECTION FORCE_INTERACTIVE INSTALL_SENSOR \
+      INSTALL_KAC INSTALL_IAR IS_GKE_AUTOPILOT FALCON_SENSOR_MODE \
+      VERBOSE SHOW_VERSIONS
+```
+
+Use this command to clear your environment before setting new values or switching between different deployments.
+
 ### Download and Run Locally
 ```bash
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
