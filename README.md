@@ -104,6 +104,44 @@ export CLUSTERNAME="your-cluster-name"
 
 ## 🏷️ Image Version Selection
 
+### Interactive Version Selection (NEW!)
+
+**Automatic during deployment** - The script now dynamically fetches available versions and prompts you to select:
+
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="your-cluster-name"
+./quick-deploy.sh
+```
+
+**Interactive Flow:**
+```
+🏷️ Fetching latest available image versions...
+
+Falcon Sensor versions available:
+  1	7.31.0-18410-1
+  2	7.32.0-18504-1
+  3	7.33.0-18606-1
+  4	7.34.0-18708-1
+
+Select Falcon Sensor version (1-4, or 'latest' for newest): 3
+✅ Selected Falcon Sensor version: 7.33.0-18606-1
+
+Version selections summary:
+  Sensor: 7.33.0-18606-1
+  KAC: latest
+  Image Analyzer: latest
+
+Proceed with these version selections? [Y/n]: y
+```
+
+**Skip Interactive Selection:**
+```bash
+export SKIP_VERSION_SELECTION=true
+./quick-deploy.sh  # Uses latest versions automatically
+```
+
 ### List Available Versions
 ```bash
 export FALCON_CLIENT_ID="your-client-id"
@@ -111,33 +149,13 @@ export FALCON_CLIENT_SECRET="your-client-secret"
 ./quick-deploy.sh list-versions
 ```
 
-This shows all available image versions for each component:
-```
-Falcon Sensor versions:
-  7.31.0-18410-1
-  7.32.0-18504-1
-  7.33.0-18606-1
-  7.34.0-18708-1
-
-Falcon KAC versions:
-  7.33.0-3105
-  7.34.0-3201
-  7.35.0-3302
-
-Falcon Image Analyzer versions:
-  1.0.20
-  1.0.21
-  1.0.22
-  1.0.23
-```
-
-### Deploy with Specific Versions
+### Deploy with Pre-set Versions (Automation)
 ```bash
 export FALCON_CLIENT_ID="your-client-id"
 export FALCON_CLIENT_SECRET="your-client-secret"
 export CLUSTERNAME="your-cluster-name"
 
-# Specify custom image versions
+# Pre-set versions (skips interactive selection)
 export FALCON_SENSOR_VERSION="7.33.0-18606-1"
 export FALCON_KAC_VERSION="7.34.0-3201"
 export FALCON_IAR_VERSION="1.0.22"
@@ -145,11 +163,10 @@ export FALCON_IAR_VERSION="1.0.22"
 ./quick-deploy.sh
 ```
 
-**Version Selection Options:**
-- **Latest (default)**: Script automatically uses newest available versions
-- **Custom versions**: Set environment variables for specific versions
-- **Mixed approach**: Specify versions only for some components, others use latest
-- **Version validation**: Script validates specified versions exist before deployment
+**Version Selection Priority:**
+1. **Pre-set environment variables** - Highest priority, skips interactive selection
+2. **Interactive selection** - Prompts during deployment (default for TTY)
+3. **Latest versions** - Used when no selection made or in non-interactive mode
 
 ## 🔍 Verification
 
