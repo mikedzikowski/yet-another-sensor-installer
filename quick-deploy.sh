@@ -100,6 +100,7 @@ select_components() {
     INSTALL_KAC="${INSTALL_KAC:-true}"
     INSTALL_IAR="${INSTALL_IAR:-true}"
     IS_GKE_AUTOPILOT="${IS_GKE_AUTOPILOT:-false}"
+    FALCON_SENSOR_MODE="${FALCON_SENSOR_MODE:-kernel}"
 
     # Log selections with better formatting
     clean_info "Selected components:"
@@ -110,6 +111,24 @@ select_components() {
     echo
     clean_info "Cluster type:"
     [[ "$IS_GKE_AUTOPILOT" == "true" ]] && clean_success "⚙️  GKE Autopilot" || clean_info "🖥️  Standard Kubernetes"
+
+    # Show sensor mode configuration if sensor is enabled
+    if [[ "$INSTALL_SENSOR" == "true" ]]; then
+        echo
+        clean_info "Falcon Sensor mode:"
+        case "$FALCON_SENSOR_MODE" in
+            "kernel")
+                clean_success "🔒 Kernel mode"
+                ;;
+            "bpf")
+                clean_info "🛡️  eBPF user mode"
+                ;;
+            *)
+                clean_warning "⚠️  Unknown sensor mode: $FALCON_SENSOR_MODE (using kernel mode)"
+                FALCON_SENSOR_MODE="kernel"
+                ;;
+        esac
+    fi
 
     # Validate at least one component is selected
     if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" ]]; then
@@ -912,6 +931,12 @@ deploy_falcon() {
         --set falcon-sensor.enabled=true \
         --set falcon-sensor.node.image.repository=\"$SENSOR_REGISTRY\" \
         --set falcon-sensor.node.image.tag=\"$SENSOR_IMAGE_TAG\""
+
+        # Add sensor backend mode configuration
+        if [[ -n "$FALCON_SENSOR_MODE" ]]; then
+            helm_cmd="$helm_cmd \
+            --set falcon-sensor.node.backend=\"$FALCON_SENSOR_MODE\""
+        fi
 
         # Add GKE Autopilot settings if needed
         if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then

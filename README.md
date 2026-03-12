@@ -33,64 +33,148 @@ Create OAuth client at [falcon.crowdstrike.com](https://falcon.crowdstrike.com) 
 
 ### AKS (Azure Kubernetes Service)
 ```bash
-export FALCON_CLIENT_ID="your-falcon-oauth-client-id" && \
-export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret" && \
-export INSTALL_SENSOR=true && \
-export INSTALL_KAC=true && \
-export INSTALL_IAR=true && \
-export IS_GKE_AUTOPILOT=false && \
-export CLUSTERNAME="aks-standard" && \
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+# Standard AKS deployment with interactive version selection
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="aks-production"
+export INSTALL_SENSOR=true
+export INSTALL_KAC=true
+export INSTALL_IAR=true
+
+# Download and run with interactive prompts
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+chmod +x quick-deploy.sh
+./quick-deploy.sh
 ```
 
 ### EKS (Amazon Elastic Kubernetes Service)
 ```bash
-export FALCON_CLIENT_ID="your-falcon-oauth-client-id" && \
-export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret" && \
-export INSTALL_SENSOR=true && \
-export INSTALL_KAC=true && \
-export INSTALL_IAR=true && \
-export CLUSTERNAME="eks-cluster" && \
+# EKS deployment with latest versions (automation-friendly)
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="eks-production"
+export SKIP_VERSION_SELECTION=true
+
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
 ### GKE Standard (Google Kubernetes Engine)
 ```bash
-export FALCON_CLIENT_ID="your-falcon-oauth-client-id" && \
-export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret" && \
-export INSTALL_SENSOR=true && \
-export INSTALL_KAC=true && \
-export INSTALL_IAR=true && \
-export CLUSTERNAME="gke-standard" && \
+# GKE Standard with custom component selection
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="gke-standard-prod"
+export INSTALL_SENSOR=true    # Node protection
+export INSTALL_KAC=false      # Skip admission controller
+export INSTALL_IAR=true       # Include image analyzer
+
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
-### GKE Autopilot
+### GKE Autopilot 🤖
 ```bash
-export FALCON_CLIENT_ID="your-falcon-oauth-client-id" && \
-export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret" && \
-export INSTALL_SENSOR=true && \
-export INSTALL_KAC=true && \
-export INSTALL_IAR=true && \
-export IS_GKE_AUTOPILOT=true && \
-export CLUSTERNAME="gke-auto-pilot" && \
+# GKE Autopilot requires user mode (eBPF recommended)
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="gke-autopilot-prod"
+export IS_GKE_AUTOPILOT=true   # REQUIRED for Autopilot
+export FALCON_SENSOR_MODE=bpf  # RECOMMENDED for Autopilot
+export INSTALL_SENSOR=true
+export INSTALL_KAC=true
+export INSTALL_IAR=true
+
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
 
-> **GKE Autopilot Note**: The script automatically creates an `AllowlistSynchronizer` resource that grants CrowdStrike workloads the necessary permissions to run security operations on GKE Autopilot clusters. This is required due to Autopilot's restrictive security policies.
+**🔧 GKE Autopilot Special Handling:**
+
+The script automatically configures Autopilot-specific requirements:
+
+1. **AllowlistSynchronizer Creation:**
+   ```yaml
+   apiVersion: auto.gke.io/v1
+   kind: AllowlistSynchronizer
+   metadata:
+     name: crowdstrike-synchronizer
+   spec:
+     allowlistPaths:
+     - CrowdStrike/falcon-sensor/*
+   ```
+
+2. **Security Context Adjustments:**
+   - Removes privileged security contexts
+   - Configures appropriate capabilities
+   - Sets up required resource limits
+
+3. **Workload Identity Integration:**
+   - Configures service accounts for Autopilot compatibility
+   - Sets up proper RBAC permissions
+
+> **📘 GKE Autopilot Note**: The script detects and automatically handles Autopilot's restrictive security policies. The `AllowlistSynchronizer` grants CrowdStrike workloads necessary permissions for security operations. **eBPF mode is recommended** for optimal compatibility.
 >
-> For more details, see: [GKE Autopilot Security Policies](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-security)
+> **Reference**: [GKE Autopilot Security Policies](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-security)
+
+## 🚀 Additional Deployment Scenarios
+
+### OpenShift / Security-Restricted Environment
+```bash
+# For OpenShift or other security-restricted Kubernetes distributions
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="openshift-prod"
+export FALCON_SENSOR_MODE=bpf  # Required for restricted security contexts
+export INSTALL_SENSOR=true
+export INSTALL_KAC=true
+export INSTALL_IAR=true
+
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+```
+
+### Development/Testing Environment
+```bash
+# Quick deployment with kernel mode for testing
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="dev-cluster"
+export FALCON_SENSOR_MODE=kernel  # Maximum visibility for testing
+export INSTALL_SENSOR=true
+export INSTALL_KAC=false  # Skip admission controller in dev
+export INSTALL_IAR=false  # Skip image analyzer in dev
+
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+```
 
 ## 🔧 Configuration Options
 
 ### Component Selection
 ```bash
-export INSTALL_SENSOR=true     # Enable/disable Falcon Sensor
-export INSTALL_KAC=true        # Enable/disable Admission Controller
-export INSTALL_IAR=true        # Enable/disable Image Analyzer
-export IS_GKE_AUTOPILOT=true   # Enable GKE Autopilot mode
-export VERBOSE=true            # Enable detailed output
+export INSTALL_SENSOR=true           # Enable/disable Falcon Sensor
+export INSTALL_KAC=true              # Enable/disable Admission Controller
+export INSTALL_IAR=true              # Enable/disable Image Analyzer
+export IS_GKE_AUTOPILOT=true         # Enable GKE Autopilot mode
+export FALCON_SENSOR_MODE=kernel     # Sensor mode: kernel, bpf
+export VERBOSE=true                  # Enable detailed output
 ```
+
+### 🔒 Falcon Sensor Mode Options
+
+Choose between different sensor deployment modes:
+
+#### Kernel Mode
+```bash
+export FALCON_SENSOR_MODE=kernel
+```
+- **Best for**: Production environments
+- **Features**: Full kernel-level access and protection
+- **Requirements**: Standard Kubernetes clusters with privileged container support
+
+#### eBPF User Mode
+```bash
+export FALCON_SENSOR_MODE=bpf
+```
+- **Best for**: GKE Autopilot, OpenShift, security-restricted environments
+- **Features**: eBPF-based monitoring without kernel module
+- **Requirements**: Linux kernel 4.15+ with eBPF support
 
 ### Download and Run Locally
 ```bash
@@ -102,71 +186,172 @@ export CLUSTERNAME="your-cluster-name"
 ./quick-deploy.sh
 ```
 
-## 🏷️ Image Version Selection
+## 🏷️ Interactive Image Version Selection
 
-### Interactive Version Selection (NEW!)
+### 🎯 Dynamic Version Selection (NEW!)
 
-**Automatic during deployment** - The script now dynamically fetches available versions and prompts you to select:
+The script now **dynamically fetches available versions** from CrowdStrike's API in real-time and presents them for interactive selection.
+
+#### Method 1: Interactive Selection (Recommended)
+
+**⚠️ IMPORTANT: Interactive mode requires downloading the script locally**
 
 ```bash
+# Step 1: Download the script
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+
+# Step 2: Make it executable
+chmod +x quick-deploy.sh
+
+# Step 3: Set required environment variables
 export FALCON_CLIENT_ID="your-client-id"
 export FALCON_CLIENT_SECRET="your-client-secret"
 export CLUSTERNAME="your-cluster-name"
+
+# Step 4: Set optional component selections (defaults to true)
+export INSTALL_SENSOR=true           # Falcon Sensor (node protection)
+export INSTALL_KAC=true              # Kubernetes Admission Controller
+export INSTALL_IAR=true              # Image Analyzer
+export IS_GKE_AUTOPILOT=false        # Set to true for GKE Autopilot
+export FALCON_SENSOR_MODE=kernel     # Sensor mode: kernel, bpf
+
+# Step 5: Run the script locally
 ./quick-deploy.sh
 ```
 
-**Interactive Flow:**
-```
+> **📝 Why Download Required?** Interactive prompts need direct access to your terminal's input stream (stdin). When you pipe through `curl | bash`, stdin is consumed by curl and the script can't read your responses.
+
+**Interactive Experience:**
+
+```console
 🏷️ Fetching latest available image versions...
 
 Falcon Sensor versions available:
-  1	7.31.0-18410-1
-  2	7.32.0-18504-1
-  3	7.33.0-18606-1
-  4	7.34.0-18708-1
+  1    7.31.0-18410-1
+  2    7.32.0-18504-1
+  3    7.33.0-18606-1
+  4    7.34.0-18708-1
+  5    7.35.0-18810-1  ← New versions appear automatically
 
-Select Falcon Sensor version (1-4, or 'latest' for newest): 3
-✅ Selected Falcon Sensor version: 7.33.0-18606-1
+Select Falcon Sensor version (1-5, or 'latest' for newest): 4
+✅ Selected Falcon Sensor version: 7.34.0-18708-1
+
+Falcon KAC versions available:
+  1    7.33.0-3105
+  2    7.34.0-3201
+  3    7.35.0-3302
+
+Select Falcon KAC version (1-3, or 'latest' for newest): latest
+ℹ️  Using latest Falcon KAC version
 
 Version selections summary:
-  Sensor: 7.33.0-18606-1
+  Sensor: 7.34.0-18708-1
   KAC: latest
   Image Analyzer: latest
 
 Proceed with these version selections? [Y/n]: y
 ```
 
-**Skip Interactive Selection:**
-```bash
-export SKIP_VERSION_SELECTION=true
-./quick-deploy.sh  # Uses latest versions automatically
-```
+#### Method 2: Force Interactive in Cloud Shell
 
-### List Available Versions
+**For non-TTY environments like Google Cloud Shell, AWS CloudShell, etc.**
+
 ```bash
+# Step 1: Download the script
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+
+# Step 2: Make it executable
+chmod +x quick-deploy.sh
+
+# Step 3: Set required environment variables
 export FALCON_CLIENT_ID="your-client-id"
 export FALCON_CLIENT_SECRET="your-client-secret"
-./quick-deploy.sh list-versions
+export CLUSTERNAME="your-cluster-name"
+
+# Step 4: Set optional component selections
+export INSTALL_SENSOR=true
+export INSTALL_KAC=true
+export INSTALL_IAR=true
+export IS_GKE_AUTOPILOT=false        # Set to true for GKE Autopilot
+export FALCON_SENSOR_MODE=kernel     # Sensor mode: kernel, bpf
+
+# Step 5: Force interactive mode
+export FORCE_INTERACTIVE=true
+
+# Step 6: Run the script
+./quick-deploy.sh
 ```
 
-### Deploy with Pre-set Versions (Automation)
+#### Method 3: Skip Interactive (Automation)
+
+```bash
+# Uses latest versions automatically - no prompts
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="your-cluster-name"
+export SKIP_VERSION_SELECTION=true
+
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+```
+
+#### Method 4: Pre-set Specific Versions
+
 ```bash
 export FALCON_CLIENT_ID="your-client-id"
 export FALCON_CLIENT_SECRET="your-client-secret"
 export CLUSTERNAME="your-cluster-name"
 
 # Pre-set versions (skips interactive selection)
-export FALCON_SENSOR_VERSION="7.33.0-18606-1"
-export FALCON_KAC_VERSION="7.34.0-3201"
-export FALCON_IAR_VERSION="1.0.22"
+export FALCON_SENSOR_VERSION="7.34.0-18708-1"
+export FALCON_KAC_VERSION="7.35.0-3302"
+export FALCON_IAR_VERSION="1.0.23"
 
 ./quick-deploy.sh
 ```
 
-**Version Selection Priority:**
+### 📋 List Available Versions Only
+
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+
+./quick-deploy.sh list-versions
+```
+
+**Sample Output:**
+```console
+🛡️ CrowdStrike Falcon Available Image Versions
+
+Falcon Sensor versions:
+  7.31.0-18410-1
+  7.32.0-18504-1
+  7.33.0-18606-1
+  7.34.0-18708-1
+
+Falcon KAC versions:
+  7.33.0-3105
+  7.34.0-3201
+  7.35.0-3302
+
+Falcon Image Analyzer versions:
+  1.0.20
+  1.0.21
+  1.0.22
+  1.0.23
+```
+
+### 🔄 Version Selection Priority
+
 1. **Pre-set environment variables** - Highest priority, skips interactive selection
 2. **Interactive selection** - Prompts during deployment (default for TTY)
 3. **Latest versions** - Used when no selection made or in non-interactive mode
+
+### ✨ Why Dynamic Versions?
+
+- **🔄 Always Current**: Versions fetched real-time from CrowdStrike API
+- **🚀 Zero Maintenance**: New releases appear automatically
+- **🎯 Real Selection**: Choose only from available versions
+- **📦 Latest Available**: "latest" option gets absolute newest version
 
 ## 🔍 Verification
 
@@ -190,44 +375,206 @@ falcon-kac              falcon-kac-xxx-xxx                           3/3     Run
 falcon-system           falcon-platform-falcon-sensor-xxx            1/1     Running   0          2m
 ```
 
-## 🗑️ Cleanup Instructions
+## 🗑️ Comprehensive Cleanup Guide
 
-### Enhanced Complete Removal (Recommended)
+### 🎯 Enhanced One-Command Cleanup (Recommended)
+
+The script now includes **intelligent cleanup** that automatically detects and removes all types of Falcon installations:
+
 ```bash
+# Complete automated cleanup
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash -s cleanup
 ```
 
-The enhanced cleanup automatically removes:
-- ✅ **Falcon Platform umbrella chart** deployments
-- ✅ **Individual component releases** (falcon-sensor, falcon-kac, falcon-image-analyzer installed separately)
+**What gets automatically removed:**
+
+- ✅ **Falcon Platform umbrella chart** deployments (helm)
+- ✅ **Individual component releases** (falcon-sensor, falcon-kac, falcon-image-analyzer)
 - ✅ **Falcon Operator** installations and Custom Resource Definitions (CRDs)
-- ✅ **All namespaces** (falcon-platform, falcon-system, falcon-kac, falcon-image-analyzer, falcon-operator, crowdstrike-*)
-- ✅ **ValidatingWebhookConfigurations**
-- ✅ **AllowlistSynchronizers** (GKE Autopilot)
-- ✅ **Stuck resources** and finalizers
+- ✅ **All related namespaces** (falcon-platform, falcon-system, falcon-kac, falcon-image-analyzer, falcon-operator, crowdstrike-*)
+- ✅ **ValidatingWebhookConfigurations** and admission controllers
+- ✅ **AllowlistSynchronizers** (GKE Autopilot specific)
+- ✅ **Stuck resources and finalizers** handling
+- ✅ **Cross-namespace resource cleanup**
 
-### Manual Cleanup (if automated cleanup fails)
+### 📋 Cleanup Scenarios
+
+#### Scenario 1: Platform Chart Installation (Most Common)
+
 ```bash
-# Remove Helm releases (platform chart)
-helm uninstall falcon-platform -n falcon-platform
+# If you deployed using the umbrella chart (this script)
+./quick-deploy.sh cleanup
+```
 
-# Remove individual component releases (if they exist)
+**Sample Output:**
+```console
+🧹 Cleaning up existing Falcon deployment...
+
+Searching for all Falcon-related releases across all namespaces...
+Removing release 'falcon-platform' from namespace 'falcon-platform'...
+✅ Falcon Platform umbrella chart deployments
+
+Removing Falcon namespaces...
+✅ All namespaces (falcon-platform, falcon-system, falcon-kac, falcon-image-analyzer)
+
+Removing webhook configurations...
+✅ ValidatingWebhookConfigurations
+
+✅ Cleanup completed
+ℹ️  You can now run the deployment again
+```
+
+#### Scenario 2: Mixed Installation Cleanup
+
+```bash
+# If you have a combination of platform chart + individual components
+./quick-deploy.sh cleanup
+```
+
+**Sample Output:**
+```console
+🧹 Cleaning up existing Falcon deployment...
+
+Found individual Falcon component releases (non-platform chart):
+  falcon-sensor      falcon-system        deployed
+  falcon-kac         falcon-kac           deployed
+
+⚠️  Individual Falcon component releases cleaned up
+
+Found Falcon Operator releases:
+  falcon-operator    falcon-operator      deployed
+
+Found Falcon/CrowdStrike CRDs:
+  falconadmissions.falcon.crowdstrike.com
+  falconcontainers.falcon.crowdstrike.com
+
+⚠️  Falcon Operator installation cleaned up
+
+✅ Cleanup completed
+```
+
+#### Scenario 3: GKE Autopilot Cleanup
+
+```bash
+# Automatically handles GKE Autopilot specific resources
+./quick-deploy.sh cleanup
+```
+
+**Additional cleanup for Autopilot:**
+- ✅ Removes `AllowlistSynchronizer` resources
+- ✅ Cleans up `WorkloadAllowlist` configurations
+- ✅ Handles Autopilot-specific security constraints
+
+### 🔧 Manual Cleanup (Troubleshooting)
+
+If automated cleanup fails or you need granular control:
+
+#### Step 1: Remove Helm Releases
+
+```bash
+# Platform chart (umbrella deployment)
+helm uninstall falcon-platform -n falcon-platform --ignore-not-found
+
+# Individual components (if they exist)
 helm uninstall falcon-sensor -n falcon-system --ignore-not-found
 helm uninstall falcon-kac -n falcon-kac --ignore-not-found
 helm uninstall falcon-image-analyzer -n falcon-image-analyzer --ignore-not-found
 
-# Remove Falcon Operator (if installed)
+# Falcon Operator
 helm uninstall falcon-operator -n falcon-operator --ignore-not-found
+```
 
-# Delete all Falcon namespaces
-kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer falcon-operator --ignore-not-found
+#### Step 2: Remove Namespaces
 
-# Clean up webhooks and CRDs
-kubectl delete validatingwebhookconfigurations -l app.kubernetes.io/instance=falcon-platform --ignore-not-found
-kubectl delete crd $(kubectl get crd | grep -E "(falcon|crowdstrike)" | awk '{print $1}') --ignore-not-found
+```bash
+# Delete all Falcon-related namespaces
+kubectl delete namespace \
+  falcon-platform \
+  falcon-system \
+  falcon-kac \
+  falcon-image-analyzer \
+  falcon-operator \
+  --ignore-not-found \
+  --timeout=120s
+```
 
-# (GKE Autopilot only) Remove AllowlistSynchronizer
+#### Step 3: Clean Up Webhooks and CRDs
+
+```bash
+# Remove validating webhooks
+kubectl delete validatingwebhookconfigurations \
+  -l app.kubernetes.io/instance=falcon-platform \
+  --ignore-not-found
+
+# Remove individual webhook configurations
+kubectl delete validatingwebhookconfigurations \
+  validating.falcon-kac.crowdstrike.com \
+  falcon-kac-validating-webhook \
+  --ignore-not-found
+
+# Remove CrowdStrike CRDs
+kubectl get crd | grep -E "(falcon|crowdstrike)" | awk '{print $1}' | \
+  xargs -r kubectl delete crd --ignore-not-found
+```
+
+#### Step 4: GKE Autopilot Specific
+
+```bash
+# Remove AllowlistSynchronizer (GKE Autopilot only)
 kubectl delete allowlistsynchronizers crowdstrike-synchronizer --ignore-not-found
+```
+
+#### Step 5: Force Clean Stuck Resources
+
+```bash
+# Remove stuck resources with finalizers
+kubectl delete all,pvc,secrets,configmaps \
+  -l app.kubernetes.io/instance=falcon-platform \
+  --all-namespaces \
+  --ignore-not-found \
+  --force \
+  --grace-period=0
+```
+
+### 🔍 Cleanup Verification
+
+```bash
+# Verify no Helm releases remain
+helm list -A | grep falcon
+
+# Check for remaining namespaces
+kubectl get namespace | grep -E "(falcon|crowdstrike)"
+
+# Verify no pods are running
+kubectl get pods -A | grep falcon
+
+# Check for remaining webhooks
+kubectl get validatingwebhookconfigurations | grep -i crowdstrike
+
+# Verify CRDs are removed
+kubectl get crd | grep -E "(falcon|crowdstrike)"
+```
+
+### ⚠️ Troubleshooting Common Issues
+
+**Namespace Stuck in Terminating:**
+```bash
+# Force remove finalizers
+kubectl get namespace falcon-system -o json | \
+  jq '.spec.finalizers = []' | \
+  kubectl replace --raw "/api/v1/namespaces/falcon-system/finalize" -f -
+```
+
+**Webhook Blocking Operations:**
+```bash
+# Temporarily disable webhooks
+kubectl delete validatingwebhookconfigurations --all
+```
+
+**CRDs Won't Delete:**
+```bash
+# Remove finalizers from CRDs
+kubectl patch crd falconadmissions.falcon.crowdstrike.com -p '{"metadata":{"finalizers":[]}}' --type=merge
 ```
 
 ## 📺 What the Script Does
