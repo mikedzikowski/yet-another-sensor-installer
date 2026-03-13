@@ -239,14 +239,120 @@ curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment
 
 ## 🔧 Configuration Options
 
-### Component Selection
+### 📝 Environment Variables Reference
+
+#### **Required Variables**
 ```bash
-export INSTALL_SENSOR=true           # Enable/disable Falcon Sensor
-export INSTALL_KAC=true              # Enable/disable Admission Controller
-export INSTALL_IAR=true              # Enable/disable Image Analyzer
-export IS_GKE_AUTOPILOT=true         # Enable GKE Autopilot mode
-export FALCON_SENSOR_MODE=kernel     # Sensor mode: kernel, bpf
-export VERBOSE=true                  # Enable detailed output
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"           # CrowdStrike Falcon OAuth Client ID
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"   # CrowdStrike Falcon OAuth Client Secret
+export CLUSTERNAME="your-cluster-name"                          # Kubernetes cluster identifier
+```
+
+#### **Component Selection**
+```bash
+export INSTALL_SENSOR=true           # Enable/disable Falcon Sensor (default: true)
+export INSTALL_KAC=true              # Enable/disable Kubernetes Admission Controller (default: true)
+export INSTALL_IAR=true              # Enable/disable Image Analyzer (default: true)
+```
+
+#### **Platform Configuration**
+```bash
+export IS_GKE_AUTOPILOT=false        # Enable GKE Autopilot compatibility mode (default: false)
+export FALCON_SENSOR_MODE=kernel     # Sensor deployment mode: kernel, bpf (default: kernel)
+```
+
+#### **Version Selection**
+```bash
+export FALCON_SENSOR_VERSION="7.34.0-18708-1"     # Specific Falcon Sensor version (optional)
+export FALCON_KAC_VERSION="7.35.0-3302"           # Specific Falcon KAC version (optional)
+export FALCON_IAR_VERSION="1.0.12"                # Specific Image Analyzer version (optional)
+export SKIP_VERSION_SELECTION=true                # Skip interactive version selection (default: false)
+export FORCE_INTERACTIVE=true                     # Force interactive mode in non-TTY environments (default: false)
+```
+
+#### **Output and Debugging**
+```bash
+export VERBOSE=true                  # Enable detailed output and debugging info (default: false)
+export SHOW_VERSIONS=true            # Display available versions without deployment (default: false)
+```
+
+#### **Advanced Configuration (Auto-Generated)**
+```bash
+# These are automatically set by the script - do not set manually
+export FALCON_CID="auto-detected"                 # Customer ID (retrieved from API)
+export ENCODED_DOCKER_CONFIG="auto-generated"     # Registry authentication token
+export SENSOR_REGISTRY="auto-detected"            # Falcon Sensor container registry
+export SENSOR_IMAGE_TAG="auto-detected"           # Falcon Sensor image tag
+export KAC_REGISTRY="auto-detected"               # Falcon KAC container registry
+export KAC_IMAGE_TAG="auto-detected"              # Falcon KAC image tag
+export IAR_REGISTRY="auto-detected"               # Image Analyzer container registry
+export IAR_IMAGE_TAG="auto-detected"              # Image Analyzer image tag
+```
+
+#### **Environment Variable Defaults Summary**
+| Variable | Default Value | Description |
+|----------|---------------|-------------|
+| `INSTALL_SENSOR` | `true` | Deploy Falcon Sensor for node protection |
+| `INSTALL_KAC` | `true` | Deploy Kubernetes Admission Controller |
+| `INSTALL_IAR` | `true` | Deploy Image Analyzer for container scanning |
+| `IS_GKE_AUTOPILOT` | `false` | Enable GKE Autopilot specific configurations |
+| `FALCON_SENSOR_MODE` | `kernel` | Sensor mode (kernel/bpf) |
+| `SKIP_VERSION_SELECTION` | `false` | Skip interactive version prompts |
+| `FORCE_INTERACTIVE` | `false` | Force interactive mode in scripts/automation |
+| `VERBOSE` | `false` | Show detailed deployment information |
+| `SHOW_VERSIONS` | `false` | List available versions only |
+
+#### **Common Configuration Examples**
+
+**Minimal Configuration (Required Only):**
+
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="production-cluster"
+```
+
+**Automation/CI/CD Pipeline:**
+
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="ci-cluster"
+export SKIP_VERSION_SELECTION=true              # Use latest versions
+export VERBOSE=true                             # Detailed logging for debugging
+```
+
+**Specific Version Configuration:**
+
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="staging-cluster"
+export FALCON_SENSOR_VERSION="7.34.0-18708-1"
+export FALCON_KAC_VERSION="7.35.0-3302"
+export FALCON_IAR_VERSION="1.0.12"
+```
+
+**GKE Autopilot Configuration:**
+
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="gke-autopilot-cluster"
+export IS_GKE_AUTOPILOT=true
+export FALCON_SENSOR_MODE=bpf                   # Recommended for Autopilot
+```
+
+**Development/Testing (Sensor Only):**
+
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="dev-cluster"
+export INSTALL_SENSOR=true
+export INSTALL_KAC=false                        # Skip admission controller
+export INSTALL_IAR=false                        # Skip image analyzer
+export VERBOSE=true                             # Enable debug output
 ```
 
 ### 🔒 Falcon Sensor Mode Options
