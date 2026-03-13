@@ -1091,9 +1091,10 @@ verify_falcon_sensor_registration() {
         # Parse and display the key information
         echo "✅ Sensor Status:"
 
-        # Extract AID (Agent ID) - look for line starting with aid=
-        if echo "$falconctl_output" | grep -q "^aid="; then
-            local aid=$(echo "$falconctl_output" | grep "^aid=" | head -1 | cut -d'=' -f2 | sed 's/[[:space:]]*$//')
+        # Extract AID (Agent ID) - handle both quoted and unquoted formats
+        local aid=""
+        if echo "$falconctl_output" | grep -q 'aid='; then
+            aid=$(echo "$falconctl_output" | grep -oE 'aid="?[^",]*"?' | head -1 | sed 's/aid="*//; s/"*,*$//')
             if [[ -n "$aid" && "$aid" != "none" && "$aid" != "" ]]; then
                 echo "   🆔 Agent ID (AID): $aid"
             else
@@ -1101,9 +1102,10 @@ verify_falcon_sensor_registration() {
             fi
         fi
 
-        # Extract CID (Customer ID) - look for line starting with cid=
-        if echo "$falconctl_output" | grep -q "^cid="; then
-            local cid=$(echo "$falconctl_output" | grep "^cid=" | head -1 | cut -d'=' -f2 | sed 's/[[:space:]]*$//')
+        # Extract CID (Customer ID) - handle both quoted and unquoted formats
+        local cid=""
+        if echo "$falconctl_output" | grep -q 'cid='; then
+            cid=$(echo "$falconctl_output" | grep -oE 'cid="?[^",]*"?' | head -1 | sed 's/cid="*//; s/"*,*$//')
             if [[ -n "$cid" && "$cid" != "none" && "$cid" != "" ]]; then
                 echo "   🏢 Customer ID (CID): $cid"
             else
@@ -1111,33 +1113,37 @@ verify_falcon_sensor_registration() {
             fi
         fi
 
-        # Extract Version - look for line starting with version=
-        if echo "$falconctl_output" | grep -q "^version="; then
-            local version=$(echo "$falconctl_output" | grep "^version=" | head -1 | cut -d'=' -f2 | sed 's/[[:space:]]*$//')
+        # Extract Version - handle both quoted and unquoted formats
+        local version=""
+        if echo "$falconctl_output" | grep -q 'version'; then
+            version=$(echo "$falconctl_output" | grep -oE 'version\s*=\s*"?[^",]*"?' | head -1 | sed 's/version\s*=\s*"*//; s/"*,*$//')
             if [[ -n "$version" && "$version" != "none" && "$version" != "" ]]; then
                 echo "   📦 Sensor Version: $version"
             fi
         fi
 
-        # Extract Backend connection status - look for line starting with backend=
-        if echo "$falconctl_output" | grep -q "^backend="; then
-            local backend=$(echo "$falconctl_output" | grep "^backend=" | head -1 | cut -d'=' -f2 | sed 's/[[:space:]]*$//')
+        # Extract Backend connection status - handle both quoted and unquoted formats
+        local backend=""
+        if echo "$falconctl_output" | grep -q 'backend='; then
+            backend=$(echo "$falconctl_output" | grep -oE 'backend="?[^",]*"?' | head -1 | sed 's/backend="*//; s/"*,*$//')
             if [[ -n "$backend" && "$backend" != "none" && "$backend" != "" ]]; then
                 echo "   🌐 Backend Status: $backend"
             fi
         fi
 
-        # Extract RFM (Reduced Functionality Mode) status - look for line starting with rfm-state=
-        if echo "$falconctl_output" | grep -q "^rfm-state="; then
-            local rfm_state=$(echo "$falconctl_output" | grep "^rfm-state=" | head -1 | cut -d'=' -f2 | sed 's/[[:space:]]*$//')
+        # Extract RFM (Reduced Functionality Mode) status - handle both quoted and unquoted formats
+        local rfm_state=""
+        if echo "$falconctl_output" | grep -q 'rfm-state='; then
+            rfm_state=$(echo "$falconctl_output" | grep -oE 'rfm-state="?[^",]*"?' | head -1 | sed 's/rfm-state="*//; s/"*,*$//')
             if [[ "$rfm_state" == "false" ]]; then
                 echo "   ✅ RFM State: Normal operation (RFM disabled)"
             elif [[ "$rfm_state" == "true" ]]; then
                 echo "   ⚠️  RFM State: Reduced functionality mode enabled"
                 # Show RFM reason if available
-                if echo "$falconctl_output" | grep -q "^rfm-reason="; then
-                    local rfm_reason=$(echo "$falconctl_output" | grep "^rfm-reason=" | head -1 | cut -d'=' -f2 | sed 's/[[:space:]]*$//')
-                    if [[ -n "$rfm_reason" && "$rfm_reason" != "" ]]; then
+                local rfm_reason=""
+                if echo "$falconctl_output" | grep -q 'rfm-reason='; then
+                    rfm_reason=$(echo "$falconctl_output" | grep -oE 'rfm-reason="?[^",]*"?' | head -1 | sed 's/rfm-reason="*//; s/"*,*$//')
+                    if [[ -n "$rfm_reason" && "$rfm_reason" != "" && "$rfm_reason" != "None" ]]; then
                         echo "   📋 RFM Reason: $rfm_reason"
                     fi
                 fi
@@ -1146,8 +1152,7 @@ verify_falcon_sensor_registration() {
 
         echo
         # Check if we have a valid AID to confirm registration
-        local aid_check=$(echo "$falconctl_output" | grep "^aid=" | head -1 | cut -d'=' -f2 | sed 's/[[:space:]]*$//')
-        if [[ -n "$aid_check" && "$aid_check" != "none" && "$aid_check" != "" ]]; then
+        if [[ -n "$aid" && "$aid" != "none" && "$aid" != "" ]]; then
             clean_success "🎯 Sensor is successfully registered and communicating with CrowdStrike!"
         else
             clean_warning "⏳ Sensor is running but registration may still be in progress"
