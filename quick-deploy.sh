@@ -1102,9 +1102,9 @@ verify_falcon_sensor_registration() {
                 aid=$(echo "$falconctl_output" | grep -oE 'aid=[^,[:space:]]*' | head -1 | sed 's/aid=//; s/,$//')
             fi
             if [[ -n "$aid" && "$aid" != "none" && "$aid" != "" ]]; then
-                echo "   🆔 Agent ID (AID): $aid"
+                echo "🆔 Agent ID (AID): $aid"
             else
-                echo "   ⚠️  Agent ID (AID): Not yet assigned"
+                echo "⚠️  Agent ID (AID): Not yet assigned"
             fi
         fi
 
@@ -1119,9 +1119,9 @@ verify_falcon_sensor_registration() {
                 cid=$(echo "$falconctl_output" | grep -oE 'cid=[^,[:space:]]*' | head -1 | sed 's/cid=//; s/,$//')
             fi
             if [[ -n "$cid" && "$cid" != "none" && "$cid" != "" ]]; then
-                echo "   🏢 Customer ID (CID): $cid"
+                echo "🏢 Customer ID (CID): $cid"
             else
-                echo "   ⚠️  Customer ID (CID): Not configured"
+                echo "⚠️  Customer ID (CID): Not configured"
             fi
         fi
 
@@ -1136,7 +1136,7 @@ verify_falcon_sensor_registration() {
                 version=$(echo "$falconctl_output" | grep -oE 'version[[:space:]]*=[[:space:]]*[^,[:space:]]*' | head -1 | sed 's/version[[:space:]]*=[[:space:]]*//; s/,$//')
             fi
             if [[ -n "$version" && "$version" != "none" && "$version" != "" ]]; then
-                echo "   📦 Sensor Version: $version"
+                echo "📦 Sensor Version: $version"
             fi
         fi
 
@@ -1151,7 +1151,7 @@ verify_falcon_sensor_registration() {
                 backend=$(echo "$falconctl_output" | grep -oE 'backend=[^,[:space:]]*' | head -1 | sed 's/backend=//; s/,$//')
             fi
             if [[ -n "$backend" && "$backend" != "none" && "$backend" != "" ]]; then
-                echo "   🌐 Backend Status: $backend"
+                echo "🌐 Backend Status: $backend"
             fi
         fi
 
@@ -1166,9 +1166,9 @@ verify_falcon_sensor_registration() {
                 rfm_state=$(echo "$falconctl_output" | grep -oE 'rfm-state=[^,[:space:]]*' | head -1 | sed 's/rfm-state=//; s/,$//')
             fi
             if [[ "$rfm_state" == "false" ]]; then
-                echo "   ✅ RFM State: Normal operation (RFM disabled)"
+                echo "✅ RFM State: Normal operation (RFM disabled)"
             elif [[ "$rfm_state" == "true" ]]; then
-                echo "   ⚠️  RFM State: Reduced functionality mode enabled"
+                echo "⚠️  RFM State: Reduced functionality mode enabled"
                 # Show RFM reason if available
                 local rfm_reason=""
                 if echo "$falconctl_output" | grep -q 'rfm-reason='; then
@@ -1180,7 +1180,7 @@ verify_falcon_sensor_registration() {
                         rfm_reason=$(echo "$falconctl_output" | grep -oE 'rfm-reason=[^,[:space:]]*' | head -1 | sed 's/rfm-reason=//; s/,$//')
                     fi
                     if [[ -n "$rfm_reason" && "$rfm_reason" != "" && "$rfm_reason" != "None" ]]; then
-                        echo "   📋 RFM Reason: $rfm_reason"
+                        echo "📋 RFM Reason: $rfm_reason"
                     fi
                 fi
             fi
