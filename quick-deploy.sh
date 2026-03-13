@@ -1094,7 +1094,13 @@ verify_falcon_sensor_registration() {
         # Extract AID (Agent ID) - handle both quoted and unquoted formats
         local aid=""
         if echo "$falconctl_output" | grep -q 'aid='; then
-            aid=$(echo "$falconctl_output" | grep -oE 'aid="?[^",]*"?' | head -1 | sed 's/aid="*//; s/"*,*$//')
+            # Try quoted format first: aid="value"
+            if echo "$falconctl_output" | grep -q 'aid="[^"]*"'; then
+                aid=$(echo "$falconctl_output" | grep -oE 'aid="[^"]*"' | head -1 | sed 's/aid="//; s/"$//')
+            else
+                # Try unquoted format: aid=value
+                aid=$(echo "$falconctl_output" | grep -oE 'aid=[^,[:space:]]*' | head -1 | sed 's/aid=//; s/,$//')
+            fi
             if [[ -n "$aid" && "$aid" != "none" && "$aid" != "" ]]; then
                 echo "   🆔 Agent ID (AID): $aid"
             else
@@ -1105,7 +1111,13 @@ verify_falcon_sensor_registration() {
         # Extract CID (Customer ID) - handle both quoted and unquoted formats
         local cid=""
         if echo "$falconctl_output" | grep -q 'cid='; then
-            cid=$(echo "$falconctl_output" | grep -oE 'cid="?[^",]*"?' | head -1 | sed 's/cid="*//; s/"*,*$//')
+            # Try quoted format first: cid="value"
+            if echo "$falconctl_output" | grep -q 'cid="[^"]*"'; then
+                cid=$(echo "$falconctl_output" | grep -oE 'cid="[^"]*"' | head -1 | sed 's/cid="//; s/"$//')
+            else
+                # Try unquoted format: cid=value
+                cid=$(echo "$falconctl_output" | grep -oE 'cid=[^,[:space:]]*' | head -1 | sed 's/cid=//; s/,$//')
+            fi
             if [[ -n "$cid" && "$cid" != "none" && "$cid" != "" ]]; then
                 echo "   🏢 Customer ID (CID): $cid"
             else
@@ -1113,10 +1125,16 @@ verify_falcon_sensor_registration() {
             fi
         fi
 
-        # Extract Version - handle both quoted and unquoted formats
+        # Extract Version - handle both quoted and unquoted formats with flexible spacing
         local version=""
         if echo "$falconctl_output" | grep -q 'version'; then
-            version=$(echo "$falconctl_output" | grep -oE 'version\s*=\s*"?[^",]*"?' | head -1 | sed 's/version\s*=\s*"*//; s/"*,*$//')
+            # Try quoted format first: version="value" or version = "value"
+            if echo "$falconctl_output" | grep -q 'version[[:space:]]*=[[:space:]]*"[^"]*"'; then
+                version=$(echo "$falconctl_output" | grep -oE 'version[[:space:]]*=[[:space:]]*"[^"]*"' | head -1 | sed 's/version[[:space:]]*=[[:space:]]*"//; s/"$//')
+            else
+                # Try unquoted format: version=value or version = value
+                version=$(echo "$falconctl_output" | grep -oE 'version[[:space:]]*=[[:space:]]*[^,[:space:]]*' | head -1 | sed 's/version[[:space:]]*=[[:space:]]*//; s/,$//')
+            fi
             if [[ -n "$version" && "$version" != "none" && "$version" != "" ]]; then
                 echo "   📦 Sensor Version: $version"
             fi
@@ -1125,7 +1143,13 @@ verify_falcon_sensor_registration() {
         # Extract Backend connection status - handle both quoted and unquoted formats
         local backend=""
         if echo "$falconctl_output" | grep -q 'backend='; then
-            backend=$(echo "$falconctl_output" | grep -oE 'backend="?[^",]*"?' | head -1 | sed 's/backend="*//; s/"*,*$//')
+            # Try quoted format first: backend="value"
+            if echo "$falconctl_output" | grep -q 'backend="[^"]*"'; then
+                backend=$(echo "$falconctl_output" | grep -oE 'backend="[^"]*"' | head -1 | sed 's/backend="//; s/"$//')
+            else
+                # Try unquoted format: backend=value
+                backend=$(echo "$falconctl_output" | grep -oE 'backend=[^,[:space:]]*' | head -1 | sed 's/backend=//; s/,$//')
+            fi
             if [[ -n "$backend" && "$backend" != "none" && "$backend" != "" ]]; then
                 echo "   🌐 Backend Status: $backend"
             fi
@@ -1134,7 +1158,13 @@ verify_falcon_sensor_registration() {
         # Extract RFM (Reduced Functionality Mode) status - handle both quoted and unquoted formats
         local rfm_state=""
         if echo "$falconctl_output" | grep -q 'rfm-state='; then
-            rfm_state=$(echo "$falconctl_output" | grep -oE 'rfm-state="?[^",]*"?' | head -1 | sed 's/rfm-state="*//; s/"*,*$//')
+            # Try quoted format first: rfm-state="value"
+            if echo "$falconctl_output" | grep -q 'rfm-state="[^"]*"'; then
+                rfm_state=$(echo "$falconctl_output" | grep -oE 'rfm-state="[^"]*"' | head -1 | sed 's/rfm-state="//; s/"$//')
+            else
+                # Try unquoted format: rfm-state=value
+                rfm_state=$(echo "$falconctl_output" | grep -oE 'rfm-state=[^,[:space:]]*' | head -1 | sed 's/rfm-state=//; s/,$//')
+            fi
             if [[ "$rfm_state" == "false" ]]; then
                 echo "   ✅ RFM State: Normal operation (RFM disabled)"
             elif [[ "$rfm_state" == "true" ]]; then
@@ -1142,7 +1172,13 @@ verify_falcon_sensor_registration() {
                 # Show RFM reason if available
                 local rfm_reason=""
                 if echo "$falconctl_output" | grep -q 'rfm-reason='; then
-                    rfm_reason=$(echo "$falconctl_output" | grep -oE 'rfm-reason="?[^",]*"?' | head -1 | sed 's/rfm-reason="*//; s/"*,*$//')
+                    # Try quoted format first: rfm-reason="value"
+                    if echo "$falconctl_output" | grep -q 'rfm-reason="[^"]*"'; then
+                        rfm_reason=$(echo "$falconctl_output" | grep -oE 'rfm-reason="[^"]*"' | head -1 | sed 's/rfm-reason="//; s/"$//')
+                    else
+                        # Try unquoted format: rfm-reason=value
+                        rfm_reason=$(echo "$falconctl_output" | grep -oE 'rfm-reason=[^,[:space:]]*' | head -1 | sed 's/rfm-reason=//; s/,$//')
+                    fi
                     if [[ -n "$rfm_reason" && "$rfm_reason" != "" && "$rfm_reason" != "None" ]]; then
                         echo "   📋 RFM Reason: $rfm_reason"
                     fi
