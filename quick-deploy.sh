@@ -227,7 +227,7 @@ interactive_version_selection() {
                 read -r sensor_choice
 
                 if [[ "$sensor_choice" == "latest" ]]; then
-                    export FALCON_SENSOR_VERSION=$(echo "$sensor_versions" | sed -n "1p")
+                    export FALCON_SENSOR_VERSION=$(echo "$sensor_versions" | tail -n 1)
                     clean_success "Selected Falcon Sensor version (latest): $FALCON_SENSOR_VERSION"
                     break
                 elif [[ "$sensor_choice" =~ ^[0-9]+$ ]] && [[ "$sensor_choice" -ge 1 ]] && [[ "$sensor_choice" -le $(echo "$sensor_versions" | wc -l) ]]; then
@@ -257,7 +257,7 @@ interactive_version_selection() {
                 read -r kac_choice
 
                 if [[ "$kac_choice" == "latest" ]]; then
-                    export FALCON_KAC_VERSION=$(echo "$kac_versions" | sed -n "1p")
+                    export FALCON_KAC_VERSION=$(echo "$kac_versions" | tail -n 1)
                     clean_success "Selected Falcon KAC version (latest): $FALCON_KAC_VERSION"
                     break
                 elif [[ "$kac_choice" =~ ^[0-9]+$ ]] && [[ "$kac_choice" -ge 1 ]] && [[ "$kac_choice" -le $(echo "$kac_versions" | wc -l) ]]; then
@@ -287,7 +287,7 @@ interactive_version_selection() {
                 read -r iar_choice
 
                 if [[ "$iar_choice" == "latest" ]]; then
-                    export FALCON_IAR_VERSION=$(echo "$iar_versions" | sed -n "1p")
+                    export FALCON_IAR_VERSION=$(echo "$iar_versions" | tail -n 1)
                     clean_success "Selected Falcon Image Analyzer version (latest): $FALCON_IAR_VERSION"
                     break
                 elif [[ "$iar_choice" =~ ^[0-9]+$ ]] && [[ "$iar_choice" -ge 1 ]] && [[ "$iar_choice" -le $(echo "$iar_versions" | wc -l) ]]; then
