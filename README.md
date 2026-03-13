@@ -29,6 +29,79 @@ Your Falcon OAuth client needs these permissions:
 
 Create OAuth client at [falcon.crowdstrike.com](https://falcon.crowdstrike.com) → **Support and resources** → **API Clients & Keys**
 
+## 🎬 Demo: Deployment in Action
+
+Watch the CrowdStrike Falcon deployment simplifier in action with interactive version selection:
+
+![CrowdStrike Falcon Deployment Demo](./assets/falcon-deployment-demo.gif)
+
+> **🎯 What you'll see in this demo:**
+> - Interactive version selection for Falcon components
+> - Real-time progress indicators during deployment
+> - Automatic configuration and verification
+> - Complete deployment in under 3 minutes
+
+**Don't have the demo GIF yet?** Here's what a typical deployment session looks like:
+
+```console
+$ ./quick-deploy.sh
+🛡️ CrowdStrike Falcon Simple Deployment
+
+────────────────────────────────────────────────────────────────
+🔧 ENVIRONMENT VALIDATION
+────────────────────────────────────────────────────────────────
+
+✅ Environment validation passed
+Cluster: production-cluster
+Client ID: 12345678...
+
+────────────────────────────────────────────────────────────────
+🔧 INTERACTIVE VERSION SELECTION
+────────────────────────────────────────────────────────────────
+
+🏷️ Fetching latest available image versions...
+
+Falcon Sensor versions available:
+1    7.31.0-18410-1
+2    7.32.0-18504-1
+3    7.33.0-18606-1
+4    7.34.0-18708-1
+5    7.35.0-18810-1
+
+Select Falcon Sensor version (1-5, or 'latest' for newest): latest
+✅ Selected Falcon Sensor version (latest): 7.35.0-18810-1
+
+Falcon KAC versions available:
+1    7.33.0-3105
+2    7.34.0-3201
+3    7.35.0-3302
+
+Select Falcon KAC version (1-3, or 'latest' for newest): latest
+✅ Selected Falcon KAC version (latest): 7.35.0-3302
+
+Version selections summary:
+  Sensor: 7.35.0-18810-1
+  KAC: 7.35.0-3302
+  Image Analyzer: 1.0.12
+
+Proceed with these version selections? [Y/n]: Y
+✅ Proceeding with selected versions
+
+────────────────────────────────────────────────────────────────
+🔧 FALCON PLATFORM DEPLOYMENT
+────────────────────────────────────────────────────────────────
+
+[INFO] Installing Falcon Platform... ⏳
+✅ Falcon Platform deployed successfully
+
+────────────────────────────────────────────────────────────────
+🔧 DEPLOYMENT VERIFICATION
+────────────────────────────────────────────────────────────────
+
+✅ All pods running successfully
+✅ Deployment completed in 2m 34s
+```
+
 ## 📋 Cloud Platform Deployment Examples
 
 ### AKS (Azure Kubernetes Service)
