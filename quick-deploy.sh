@@ -100,7 +100,7 @@ select_components() {
     INSTALL_KAC="${INSTALL_KAC:-true}"
     INSTALL_IAR="${INSTALL_IAR:-true}"
     IS_GKE_AUTOPILOT="${IS_GKE_AUTOPILOT:-false}"
-    FALCON_SENSOR_MODE="${FALCON_SENSOR_MODE:-kernel}"
+    FALCON_SENSOR_MODE="${FALCON_SENSOR_MODE:-bpf}"
 
     # Log selections with better formatting
     clean_info "Selected components:"

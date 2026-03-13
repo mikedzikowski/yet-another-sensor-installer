@@ -68,7 +68,6 @@ export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="gke-autopilot-prod"
 export IS_GKE_AUTOPILOT=true
-export FALCON_SENSOR_MODE=bpf  # Recommended for Autopilot
 
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
 ```
@@ -102,7 +101,7 @@ export CLUSTERNAME="your-cluster-name"                          # Kubernetes clu
 | `INSTALL_KAC` | `true` | Deploy Kubernetes Admission Controller |
 | `INSTALL_IAR` | `true` | Deploy Image Analyzer for container scanning |
 | `IS_GKE_AUTOPILOT` | `false` | Enable GKE Autopilot specific configurations |
-| `FALCON_SENSOR_MODE` | `kernel` | Sensor mode (kernel/bpf) |
+| `FALCON_SENSOR_MODE` | `bpf` | Sensor mode (kernel/bpf) |
 | `SKIP_VERSION_SELECTION` | `false` | Skip interactive version prompts |
 | `VERBOSE` | `false` | Show detailed deployment information |
 
