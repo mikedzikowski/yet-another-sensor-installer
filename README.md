@@ -174,69 +174,6 @@ The script automatically configures Autopilot-specific requirements:
 >
 > **Reference**: [GKE Autopilot Security Policies](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-security)
 
-## 🚀 Additional Deployment Scenarios
-
-### OpenShift / Security-Restricted Environment
-```bash
-# Interactive version selection for OpenShift or security-restricted Kubernetes
-export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
-export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
-export CLUSTERNAME="openshift-prod"
-export FALCON_SENSOR_MODE=bpf  # Required for restricted security contexts
-export INSTALL_SENSOR=true
-export INSTALL_KAC=true
-export INSTALL_IAR=true
-
-# Download and run with interactive prompts
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
-chmod +x quick-deploy.sh
-./quick-deploy.sh
-```
-
-**Non-interactive (automation):**
-```bash
-# Skip version selection prompts - uses latest versions
-export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
-export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
-export CLUSTERNAME="openshift-prod"
-export FALCON_SENSOR_MODE=bpf
-export SKIP_VERSION_SELECTION=true
-
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
-```
-
-### Development/Testing Environment
-```bash
-# Interactive deployment with kernel mode for testing
-export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
-export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
-export CLUSTERNAME="dev-cluster"
-export FALCON_SENSOR_MODE=kernel  # Maximum visibility for testing
-export INSTALL_SENSOR=true
-export INSTALL_KAC=false  # Skip admission controller in dev
-export INSTALL_IAR=false  # Skip image analyzer in dev
-
-# Download and run with interactive prompts
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
-chmod +x quick-deploy.sh
-./quick-deploy.sh
-```
-
-**Non-interactive (automation):**
-```bash
-# Skip version selection prompts - uses latest versions
-export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
-export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
-export CLUSTERNAME="dev-cluster"
-export FALCON_SENSOR_MODE=kernel
-export INSTALL_SENSOR=true
-export INSTALL_KAC=false
-export INSTALL_IAR=false
-export SKIP_VERSION_SELECTION=true
-
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
-```
-
 ## 🔧 Configuration Options
 
 ### 📝 Environment Variables Reference
