@@ -1054,9 +1054,103 @@ verify_deployment() {
     echo "Falcon Pods:"
     kubectl get pods -A | grep falcon || echo "No falcon pods found yet"
 
+    # Verify Falcon sensor registration if sensor is installed
+    if [[ "$INSTALL_SENSOR" == "true" ]]; then
+        verify_falcon_sensor_registration
+    fi
+
     clean_success "Initial verification complete!"
     echo
     clean_info "Note: Pods may take several minutes to fully start and become ready"
+}
+
+# Verify Falcon sensor registration with CrowdStrike
+verify_falcon_sensor_registration() {
+    echo
+    clean_info "Falcon Sensor Registration Status:"
+    echo "==================================="
+
+    # Find a running Falcon sensor pod
+    local sensor_pod=$(kubectl get pods -n falcon-system -l app.kubernetes.io/name=falcon-sensor --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+
+    if [[ -z "$sensor_pod" ]]; then
+        clean_warning "No running Falcon sensor pods found yet - this is normal during initial startup"
+        clean_info "Pods may still be starting. Check status later with:"
+        echo "  kubectl get pods -n falcon-system"
+        return
+    fi
+
+    clean_info "Found running sensor pod: $sensor_pod"
+    echo
+
+    # Execute falconctl command to get sensor status
+    clean_info "Retrieving sensor registration details..."
+    local falconctl_output
+    if falconctl_output=$(kubectl exec -n falcon-system "$sensor_pod" -- /opt/CrowdStrike/falconctl -g --aid --cid --version --backend --rfm-state --rfm-reason 2>/dev/null); then
+        echo
+        # Parse and display the key information
+        echo "✅ Sensor Status:"
+
+        # Extract AID (Agent ID)
+        if echo "$falconctl_output" | grep -q "aid="; then
+            local aid=$(echo "$falconctl_output" | grep "aid=" | cut -d'=' -f2 | tr -d '.')
+            if [[ -n "$aid" && "$aid" != "none" ]]; then
+                echo "   🆔 Agent ID (AID): $aid"
+            else
+                echo "   ⚠️  Agent ID (AID): Not yet assigned"
+            fi
+        fi
+
+        # Extract CID (Customer ID)
+        if echo "$falconctl_output" | grep -q "cid="; then
+            local cid=$(echo "$falconctl_output" | grep "cid=" | cut -d'=' -f2 | tr -d '.')
+            if [[ -n "$cid" && "$cid" != "none" ]]; then
+                echo "   🏢 Customer ID (CID): $cid"
+            else
+                echo "   ⚠️  Customer ID (CID): Not configured"
+            fi
+        fi
+
+        # Extract Version
+        if echo "$falconctl_output" | grep -q "version="; then
+            local version=$(echo "$falconctl_output" | grep "version=" | cut -d'=' -f2 | tr -d '.')
+            echo "   📦 Sensor Version: $version"
+        fi
+
+        # Extract Backend connection status
+        if echo "$falconctl_output" | grep -q "backend="; then
+            local backend=$(echo "$falconctl_output" | grep "backend=" | cut -d'=' -f2 | tr -d '.')
+            echo "   🌐 Backend Status: $backend"
+        fi
+
+        # Extract RFM (Reduced Functionality Mode) status
+        if echo "$falconctl_output" | grep -q "rfm-state="; then
+            local rfm_state=$(echo "$falconctl_output" | grep "rfm-state=" | cut -d'=' -f2 | tr -d '.')
+            if [[ "$rfm_state" == "false" ]]; then
+                echo "   ✅ RFM State: Normal operation (RFM disabled)"
+            else
+                echo "   ⚠️  RFM State: Reduced functionality mode enabled"
+                # Show RFM reason if available
+                if echo "$falconctl_output" | grep -q "rfm-reason="; then
+                    local rfm_reason=$(echo "$falconctl_output" | grep "rfm-reason=" | cut -d'=' -f2 | tr -d '.')
+                    echo "   📋 RFM Reason: $rfm_reason"
+                fi
+            fi
+        fi
+
+        echo
+        if echo "$falconctl_output" | grep -q "aid=" && echo "$falconctl_output" | grep "aid=" | grep -v "aid=none" >/dev/null; then
+            clean_success "🎯 Sensor is successfully registered and communicating with CrowdStrike!"
+        else
+            clean_warning "⏳ Sensor is running but registration may still be in progress"
+            clean_info "This is normal during initial startup - registration typically completes within 2-5 minutes"
+        fi
+
+    else
+        clean_warning "Unable to retrieve sensor status (pod may still be initializing)"
+        clean_info "You can check sensor status later with:"
+        echo "  kubectl exec -n falcon-system \$POD_NAME -- /opt/CrowdStrike/falconctl -g --aid --cid --version"
+    fi
 }
 
 # Print success message and next steps
@@ -1082,8 +1176,14 @@ print_success() {
     echo
     echo "Next steps:"
     echo "  1. Monitor the deployment: kubectl get pods -A | grep falcon"
-    echo "  2. Check logs if needed: kubectl logs -n <namespace> <pod-name>"
-    echo "  3. View in Falcon Console: https://falcon.crowdstrike.com"
+    if [[ "$INSTALL_SENSOR" == "true" ]]; then
+        echo "  2. Check sensor registration: kubectl exec -n falcon-system \$(kubectl get pods -n falcon-system -l app.kubernetes.io/name=falcon-sensor -o name | head -1 | cut -d/ -f2) -- /opt/CrowdStrike/falconctl -g --aid --cid"
+        echo "  3. Check logs if needed: kubectl logs -n <namespace> <pod-name>"
+        echo "  4. View in Falcon Console: https://falcon.crowdstrike.com"
+    else
+        echo "  2. Check logs if needed: kubectl logs -n <namespace> <pod-name>"
+        echo "  3. View in Falcon Console: https://falcon.crowdstrike.com"
+    fi
     echo
     echo "For troubleshooting, visit: https://github.com/CrowdStrike/falcon-helm"
 }
