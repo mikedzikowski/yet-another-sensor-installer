@@ -40,13 +40,13 @@ export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="your-cluster-name"
 
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash
 ```
 
 ### Interactive Version Selection
 ```bash
 # Download for interactive prompts
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh -o quick-deploy.sh
 chmod +x quick-deploy.sh
 ./quick-deploy.sh
 ```
@@ -59,7 +59,7 @@ export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="your-cluster-name"  # e.g., "aks-prod", "eks-prod", "gke-standard"
 
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash
 ```
 
 **GKE Autopilot:**
@@ -69,7 +69,7 @@ export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="gke-autopilot-prod"
 export IS_GKE_AUTOPILOT=true
 
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash
 ```
 
 **Component Selection:**
@@ -118,7 +118,7 @@ export FALCON_IAR_VERSION="1.0.12"                # Specific Image Analyzer vers
 Download the script locally to use interactive version selection:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh -o quick-deploy.sh
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh -o quick-deploy.sh
 chmod +x quick-deploy.sh
 
 export FALCON_CLIENT_ID="your-client-id"
@@ -133,7 +133,7 @@ Skip version prompts for CI/CD pipelines:
 
 ```bash
 export SKIP_VERSION_SELECTION=true
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash
 ```
 
 ### List Available Versions Only
@@ -167,7 +167,7 @@ falcon-system           falcon-platform-falcon-sensor-xxx            1/1     Run
 
 ### Automated Cleanup (Recommended)
 ```bash
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/crowdstrike-deployment-simplifier/main/quick-deploy.sh | bash -s cleanup
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash -s cleanup
 ```
 
 The script automatically removes:
@@ -231,6 +231,6 @@ kubectl get events -A | grep falcon
 
 ## 🤝 Support
 
-- **Issues**: [GitHub Issues](https://github.com/mikedzikowski/crowdstrike-deployment-simplifier/issues)
+- **Issues**: [GitHub Issues](https://github.com/mikedzikowski/yet-another-sensor-installer/issues)
 - **Documentation**: [CrowdStrike Falcon Helm Charts](https://github.com/CrowdStrike/falcon-helm)
 - **Console**: [falcon.crowdstrike.com](https://falcon.crowdstrike.com)
