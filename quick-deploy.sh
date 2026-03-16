@@ -1336,31 +1336,18 @@ generate_node_management_links() {
         clean_info "🔍 Debug: Node array length: ${#node_array[@]}"
     fi
 
-    # Display numbered list with console link text and URLs
-    for i in "${!node_array[@]}"; do
-        local node_num=$((i + 1))
-        local clean_node="${node_array[$i]}"
-        printf "  %2d. %-40s 🔗 Console Link\n" "$node_num" "$clean_node"
-    done
-
-    echo
-    clean_info "💡 Found $node_count nodes in cluster"
-
-    # Show the actual clickable console URLs
-    echo
-    clean_info "🔗 Clickable Console Links:"
-    echo
-
+    # Display numbered list with console URLs directly
     for i in "${!node_array[@]}"; do
         local node_num=$((i + 1))
         local clean_node="${node_array[$i]}"
         local encoded_node=$(printf '%s' "$clean_node" | jq -sRr @uri)
         local console_url="${console_base_url}/host-management/hosts?filter=hostname%3A%27${encoded_node}%27"
 
-        printf "  %2d. %s\n" "$node_num" "$clean_node"
-        echo "      🌐 $console_url"
-        echo
+        printf "  %2d. %-40s 🔗 %s\n" "$node_num" "$clean_node" "$console_url"
     done
+
+    echo
+    clean_info "💡 Found $node_count nodes in cluster"
 
     if [[ "$detected_region" != "us-1" ]]; then
         clean_info "🌍 Detected region: $detected_region (console adjusted automatically)"
