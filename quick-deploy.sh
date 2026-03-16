@@ -1550,9 +1550,29 @@ cleanup_deployment() {
 
 # Cleanup function
 cleanup() {
+    # Clean up temporary files
     if [[ -f "falcon-container-sensor-pull.sh" ]]; then
         rm -f falcon-container-sensor-pull.sh
         clean_info "Cleaned up temporary files"
+    fi
+
+    # Unset sensitive environment variables for security
+    if [[ -n "$FALCON_CLIENT_SECRET" ]]; then
+        unset FALCON_CLIENT_SECRET
+    fi
+    if [[ -n "$ENCODED_DOCKER_CONFIG" ]]; then
+        unset ENCODED_DOCKER_CONFIG
+    fi
+    if [[ -n "$FALCON_CID" ]]; then
+        unset FALCON_CID
+    fi
+    if [[ -n "$FALCON_CLIENT_ID" ]]; then
+        unset FALCON_CLIENT_ID
+    fi
+
+    # Optionally inform user (only in verbose mode to avoid noise)
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "Cleaned up sensitive environment variables"
     fi
 }
 
