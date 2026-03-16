@@ -1382,17 +1382,6 @@ print_success() {
     fi
 
     echo
-    echo "Next steps:"
-    echo "  1. Monitor the deployment: kubectl get pods -A | grep falcon"
-    if [[ "$INSTALL_SENSOR" == "true" ]]; then
-        echo "  2. Check sensor registration: kubectl exec -n falcon-system \$(kubectl get pods -n falcon-system -l app.kubernetes.io/name=falcon-sensor -o name | head -1 | cut -d/ -f2) -- /opt/CrowdStrike/falconctl -g --aid --cid"
-        echo "  3. Check logs if needed: kubectl logs -n <namespace> <pod-name>"
-        echo "  4. View in Falcon Console: $(get_console_base_url)"
-    else
-        echo "  2. Check logs if needed: kubectl logs -n <namespace> <pod-name>"
-        echo "  3. View in Falcon Console: $(get_console_base_url)"
-    fi
-    echo
     echo "For troubleshooting, visit: https://github.com/CrowdStrike/falcon-helm"
 }
 
