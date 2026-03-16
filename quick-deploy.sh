@@ -1289,19 +1289,51 @@ generate_node_management_links() {
     # Count nodes and show numbered list
     local node_count=0
     local node_array=()
+
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "🔍 Debug: Starting node processing loop"
+    fi
+
+    # Temporarily disable exit on error for this loop
+    set +e
     while IFS= read -r node; do
         if [[ -n "$node" ]]; then
-            local clean_node=$(printf '%s' "$node" | tr -d '\n\r')
-            node_array+=("$clean_node")
-            ((node_count++))
+            if [[ "$VERBOSE" == "true" ]]; then
+                clean_info "🔍 Debug: Processing raw node: '$node'"
+            fi
+
+            local clean_node
+            if ! clean_node=$(printf '%s' "$node" | tr -d '\n\r'); then
+                if [[ "$VERBOSE" == "true" ]]; then
+                    clean_warning "🔍 Debug: Failed to clean node: '$node'"
+                fi
+                continue
+            fi
+
+            if [[ "$VERBOSE" == "true" ]]; then
+                clean_info "🔍 Debug: Cleaned node: '$clean_node'"
+            fi
+
+            if ! node_array+=("$clean_node"); then
+                if [[ "$VERBOSE" == "true" ]]; then
+                    clean_warning "🔍 Debug: Failed to add node to array: '$clean_node'"
+                fi
+                continue
+            fi
+
+            ((node_count++)) || true  # Prevent exit if this fails
+
             if [[ "$VERBOSE" == "true" ]]; then
                 clean_info "🔍 Debug: Added node #$node_count: '$clean_node'"
             fi
         fi
     done <<< "$nodes"
+    # Re-enable exit on error
+    set -e
 
     if [[ "$VERBOSE" == "true" ]]; then
         clean_info "🔍 Debug: Total nodes processed: $node_count"
+        clean_info "🔍 Debug: Node array length: ${#node_array[@]}"
     fi
 
     # Display numbered list
