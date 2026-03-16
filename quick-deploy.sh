@@ -30,13 +30,13 @@ BLUE='\033[96m'    # Bright Cyan (PowerShell's info color)
 NC='\033[0m' # No Color
 
 # Logging functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # Clean logging functions without prefixes
-clean_info() { echo -e "${BLUE}$1${NC}"; }
+clean_info() { echo -e "${YELLOW}$1${NC}"; }
 clean_success() { echo -e "${GREEN}$1${NC}"; }
 clean_warning() { echo -e "${YELLOW}$1${NC}"; }
 clean_error() { echo -e "${RED}$1${NC}"; }
@@ -48,7 +48,7 @@ show_progress() {
     local interval=2
     local elapsed=0
 
-    echo -ne "${BLUE}[INFO]${NC} $message"
+    echo -ne "${YELLOW}[INFO]${NC} $message"
 
     while [[ $elapsed -lt $duration ]]; do
         echo -ne "."
@@ -994,7 +994,7 @@ deploy_falcon() {
         local deploy_pid=$!
 
         # Show progress while deployment is running
-        echo -ne "${BLUE}[INFO]${NC} Deployment in progress"
+        echo -ne "${YELLOW}[INFO]${NC} Deployment in progress"
         local dots=0
         while kill -0 $deploy_pid 2>/dev/null; do
             echo -ne "."
@@ -1034,7 +1034,7 @@ verify_deployment() {
     clean_info "Verifying deployment..."
 
     # Wait for pods to be ready with progress indicator (10 seconds total)
-    echo -ne "${BLUE}[INFO]${NC} Waiting for pods to start"
+    echo -ne "${YELLOW}[INFO]${NC} Waiting for pods to start"
     for i in {1..10}; do
         echo -ne "."
         sleep 1
