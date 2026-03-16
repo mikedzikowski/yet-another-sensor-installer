@@ -1203,6 +1203,44 @@ verify_falcon_sensor_registration() {
 }
 
 # Print success message and next steps
+# Detect CrowdStrike cloud region from registry URLs
+detect_falcon_cloud_region() {
+    local region="us-1"  # default
+
+    # Try to detect region from sensor registry URL
+    if [[ -n "$SENSOR_REGISTRY" ]]; then
+        if [[ "$SENSOR_REGISTRY" == *"us-2"* ]]; then
+            region="us-2"
+        elif [[ "$SENSOR_REGISTRY" == *"eu-1"* ]]; then
+            region="eu-1"
+        elif [[ "$SENSOR_REGISTRY" == *"gov"* ]]; then
+            region="gov"
+        fi
+    fi
+
+    echo "$region"
+}
+
+# Get the appropriate CrowdStrike console URL for detected region
+get_console_base_url() {
+    local region=$(detect_falcon_cloud_region)
+
+    case "$region" in
+        "us-2")
+            echo "https://falcon.us-2.crowdstrike.com"
+            ;;
+        "eu-1")
+            echo "https://falcon.eu-1.crowdstrike.com"
+            ;;
+        "gov")
+            echo "https://falcon.laggar.gcw.crowdstrike.com"
+            ;;
+        *)
+            echo "https://falcon.crowdstrike.com"  # us-1 default
+            ;;
+    esac
+}
+
 # Generate CrowdStrike Host Management links for cluster nodes
 generate_node_management_links() {
     echo
@@ -1221,13 +1259,22 @@ generate_node_management_links() {
         return 1
     fi
 
+    # Detect the correct console base URL for the region
+    local console_base_url=$(get_console_base_url)
+    local detected_region=$(detect_falcon_cloud_region)
+
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "Detected Falcon region: $detected_region"
+        clean_info "Using console URL: $console_base_url"
+    fi
+
     # Generate links for each node
     while IFS= read -r node; do
         if [[ -n "$node" ]]; then
             # URL encode the node name for the filter (remove any trailing newlines first)
             local clean_node=$(printf '%s' "$node" | tr -d '\n\r')
             local encoded_node=$(printf '%s' "$clean_node" | jq -sRr @uri)
-            local console_url="https://falcon.crowdstrike.com/host-management/hosts?filter=hostname%3A%27${encoded_node}%27"
+            local console_url="${console_base_url}/host-management/hosts?filter=hostname%3A%27${encoded_node}%27"
 
             echo "  🖥️  $clean_node"
             echo "     📊 Console: $console_url"
@@ -1236,6 +1283,9 @@ generate_node_management_links() {
     done <<< "$nodes"
 
     clean_info "💡 Use these links to monitor node health and sensor status in the CrowdStrike console"
+    if [[ "$detected_region" != "us-1" ]]; then
+        clean_info "🌍 Detected region: $detected_region (console adjusted automatically)"
+    fi
 }
 
 print_success() {
@@ -1268,10 +1318,10 @@ print_success() {
     if [[ "$INSTALL_SENSOR" == "true" ]]; then
         echo "  2. Check sensor registration: kubectl exec -n falcon-system \$(kubectl get pods -n falcon-system -l app.kubernetes.io/name=falcon-sensor -o name | head -1 | cut -d/ -f2) -- /opt/CrowdStrike/falconctl -g --aid --cid"
         echo "  3. Check logs if needed: kubectl logs -n <namespace> <pod-name>"
-        echo "  4. View in Falcon Console: https://falcon.crowdstrike.com"
+        echo "  4. View in Falcon Console: $(get_console_base_url)"
     else
         echo "  2. Check logs if needed: kubectl logs -n <namespace> <pod-name>"
-        echo "  3. View in Falcon Console: https://falcon.crowdstrike.com"
+        echo "  3. View in Falcon Console: $(get_console_base_url)"
     fi
     echo
     echo "For troubleshooting, visit: https://github.com/CrowdStrike/falcon-helm"
