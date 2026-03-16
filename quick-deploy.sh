@@ -1336,14 +1336,17 @@ generate_node_management_links() {
         clean_info "🔍 Debug: Node array length: ${#node_array[@]}"
     fi
 
-    # Display numbered list with console URLs directly
+    # Display numbered list with clickable console links
     for i in "${!node_array[@]}"; do
         local node_num=$((i + 1))
         local clean_node="${node_array[$i]}"
         local encoded_node=$(printf '%s' "$clean_node" | jq -sRr @uri)
         local console_url="${console_base_url}/host-management/hosts?filter=hostname%3A%27${encoded_node}%27"
 
-        printf "  %2d. %-40s 🔗 %s\n" "$node_num" "$clean_node" "$console_url"
+        # Create clickable hyperlink using terminal escape sequences
+        local clickable_link="\e]8;;${console_url}\e\\Console Link\e]8;;\e\\"
+
+        printf "  %2d. %-40s 🔗 %b\n" "$node_num" "$clean_node" "$clickable_link"
     done
 
     echo
