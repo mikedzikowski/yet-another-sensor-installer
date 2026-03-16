@@ -1289,10 +1289,14 @@ generate_node_management_links() {
     clean_info "💡 Found $node_count nodes in cluster"
 
     # Ask if user wants to see full console links
-    if [[ -t 0 ]]; then  # Only prompt if we have a TTY (interactive)
+    if [[ -t 0 ]] || [[ "$SHOW_NODE_LINKS" == "true" ]]; then  # TTY or forced
         echo
-        read -p "View detailed console links? (y/N): " -n 1 -r show_links
-        echo
+        if [[ "$SHOW_NODE_LINKS" == "true" ]]; then
+            show_links="y"  # Force show if environment variable set
+        else
+            read -p "View detailed console links? (y/N): " -n 1 -r show_links
+            echo
+        fi
 
         if [[ $show_links =~ ^[Yy]$ ]]; then
             echo
@@ -1315,10 +1319,28 @@ generate_node_management_links() {
             clean_info "💡 Use hostname filter to find specific nodes in the console"
         fi
     else
-        # Non-interactive mode - show a summary
-        echo
-        clean_info "🌐 Console base URL: $console_base_url/host-management/hosts"
-        clean_info "💡 Use hostname filter to find specific nodes in the console"
+        # Non-interactive mode - show a summary by default, or all links if requested
+        if [[ "$SHOW_NODE_LINKS" == "true" ]]; then
+            echo
+            clean_info "🔗 Console Links (non-interactive mode):"
+            echo
+
+            for i in "${!node_array[@]}"; do
+                local node_num=$((i + 1))
+                local clean_node="${node_array[$i]}"
+                local encoded_node=$(printf '%s' "$clean_node" | jq -sRr @uri)
+                local console_url="${console_base_url}/host-management/hosts?filter=hostname%3A%27${encoded_node}%27"
+
+                printf "  %2d. %s\n" "$node_num" "$clean_node"
+                echo "      📊 $console_url"
+                echo
+            done
+        else
+            echo
+            clean_info "🌐 Console base URL: $console_base_url/host-management/hosts"
+            clean_info "💡 Use hostname filter to find specific nodes in the console"
+            clean_info "🔗 To see all node links, set: export SHOW_NODE_LINKS=true"
+        fi
     fi
 
     if [[ "$detected_region" != "us-1" ]]; then
