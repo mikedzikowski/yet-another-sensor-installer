@@ -1203,6 +1203,41 @@ verify_falcon_sensor_registration() {
 }
 
 # Print success message and next steps
+# Generate CrowdStrike Host Management links for cluster nodes
+generate_node_management_links() {
+    echo
+    clean_info "📋 Cluster Nodes - CrowdStrike Host Management Links:"
+    echo
+
+    # Get cluster nodes
+    local nodes
+    if ! nodes=$(kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null); then
+        clean_warning "⚠️  Could not retrieve cluster nodes (kubectl permission issue)"
+        return 1
+    fi
+
+    if [[ -z "$nodes" ]]; then
+        clean_warning "⚠️  No nodes found in cluster"
+        return 1
+    fi
+
+    # Generate links for each node
+    while IFS= read -r node; do
+        if [[ -n "$node" ]]; then
+            # URL encode the node name for the filter (remove any trailing newlines first)
+            local clean_node=$(printf '%s' "$node" | tr -d '\n\r')
+            local encoded_node=$(printf '%s' "$clean_node" | jq -sRr @uri)
+            local console_url="https://falcon.crowdstrike.com/host-management/hosts?filter=hostname%3A%27${encoded_node}%27"
+
+            echo "  🖥️  $clean_node"
+            echo "     📊 Console: $console_url"
+            echo
+        fi
+    done <<< "$nodes"
+
+    clean_info "💡 Use these links to monitor node health and sensor status in the CrowdStrike console"
+}
+
 print_success() {
     echo
     clean_success "🎉 CrowdStrike Falcon Platform has been successfully deployed!"
@@ -1220,6 +1255,11 @@ print_success() {
 
     if [[ "$IS_GKE_AUTOPILOT" == "true" ]]; then
         echo "  ⚙️  GKE Autopilot AllowlistSynchronizer configured"
+    fi
+
+    # Add node management links if sensor is installed
+    if [[ "$INSTALL_SENSOR" == "true" ]]; then
+        generate_node_management_links
     fi
 
     echo
