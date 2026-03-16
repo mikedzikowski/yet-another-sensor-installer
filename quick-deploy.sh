@@ -1268,21 +1268,59 @@ generate_node_management_links() {
         clean_info "Using console URL: $console_base_url"
     fi
 
-    # Generate links for each node
+    # Count nodes and show numbered list
+    local node_count=0
+    local node_array=()
     while IFS= read -r node; do
         if [[ -n "$node" ]]; then
-            # URL encode the node name for the filter (remove any trailing newlines first)
             local clean_node=$(printf '%s' "$node" | tr -d '\n\r')
-            local encoded_node=$(printf '%s' "$clean_node" | jq -sRr @uri)
-            local console_url="${console_base_url}/host-management/hosts?filter=hostname%3A%27${encoded_node}%27"
-
-            echo "  🖥️  $clean_node"
-            echo "     📊 Console: $console_url"
-            echo
+            node_array+=("$clean_node")
+            ((node_count++))
         fi
     done <<< "$nodes"
 
-    clean_info "💡 Use these links to monitor node health and sensor status in the CrowdStrike console"
+    # Display numbered list
+    for i in "${!node_array[@]}"; do
+        local node_num=$((i + 1))
+        printf "  %2d. %-40s 🔗 Console Link\n" "$node_num" "${node_array[$i]}"
+    done
+
+    echo
+    clean_info "💡 Found $node_count nodes in cluster"
+
+    # Ask if user wants to see full console links
+    if [[ -t 0 ]]; then  # Only prompt if we have a TTY (interactive)
+        echo
+        read -p "View detailed console links? (y/N): " -n 1 -r show_links
+        echo
+
+        if [[ $show_links =~ ^[Yy]$ ]]; then
+            echo
+            clean_info "🔗 Detailed Console Links:"
+            echo
+
+            for i in "${!node_array[@]}"; do
+                local node_num=$((i + 1))
+                local clean_node="${node_array[$i]}"
+                local encoded_node=$(printf '%s' "$clean_node" | jq -sRr @uri)
+                local console_url="${console_base_url}/host-management/hosts?filter=hostname%3A%27${encoded_node}%27"
+
+                printf "  %2d. %s\n" "$node_num" "$clean_node"
+                echo "      📊 $console_url"
+                echo
+            done
+        else
+            echo
+            clean_info "🌐 Console base URL: $console_base_url/host-management/hosts"
+            clean_info "💡 Use hostname filter to find specific nodes in the console"
+        fi
+    else
+        # Non-interactive mode - show a summary
+        echo
+        clean_info "🌐 Console base URL: $console_base_url/host-management/hosts"
+        clean_info "💡 Use hostname filter to find specific nodes in the console"
+    fi
+
     if [[ "$detected_region" != "us-1" ]]; then
         clean_info "🌍 Detected region: $detected_region (console adjusted automatically)"
     fi
