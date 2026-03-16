@@ -1336,38 +1336,18 @@ generate_node_management_links() {
         clean_info "🔍 Debug: Node array length: ${#node_array[@]}"
     fi
 
-    # Display numbered list
+    # Display numbered list with actual console links
     for i in "${!node_array[@]}"; do
         local node_num=$((i + 1))
-        printf "  %2d. %-40s 🔗 Console Link\n" "$node_num" "${node_array[$i]}"
+        local clean_node="${node_array[$i]}"
+        local encoded_node=$(printf '%s' "$clean_node" | jq -sRr @uri)
+        local console_url="${console_base_url}/host-management/hosts?filter=hostname%3A%27${encoded_node}%27"
+
+        printf "  %2d. %-40s 🔗 %s\n" "$node_num" "$clean_node" "$console_url"
     done
 
     echo
-    clean_info "💡 Found $node_count nodes in cluster"
-
-    # Show detailed console links by default (unless explicitly hidden)
-    if [[ "$HIDE_NODE_LINKS" != "true" ]]; then
-        echo
-        clean_info "🔗 Console Links:"
-        echo
-
-        for i in "${!node_array[@]}"; do
-            local node_num=$((i + 1))
-            local clean_node="${node_array[$i]}"
-            local encoded_node=$(printf '%s' "$clean_node" | jq -sRr @uri)
-            local console_url="${console_base_url}/host-management/hosts?filter=hostname%3A%27${encoded_node}%27"
-
-            printf "  %2d. %s\n" "$node_num" "$clean_node"
-            echo "      📊 $console_url"
-            echo
-        done
-    else
-        # Compact mode when links are hidden
-        echo
-        clean_info "🌐 Console base URL: $console_base_url/host-management/hosts"
-        clean_info "💡 Use hostname filter to find specific nodes in the console"
-        clean_info "🔗 To show all node links, remove: export HIDE_NODE_LINKS=true"
-    fi
+    clean_info "💡 Found $node_count nodes in cluster - Click console URLs above to monitor nodes"
 
     if [[ "$detected_region" != "us-1" ]]; then
         clean_info "🌍 Detected region: $detected_region (console adjusted automatically)"
