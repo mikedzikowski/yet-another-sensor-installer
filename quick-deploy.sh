@@ -1247,11 +1247,29 @@ generate_node_management_links() {
     clean_info "📋 Cluster Nodes - CrowdStrike Host Management Links:"
     echo
 
+    # Debug output if verbose mode
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "🔍 Debug: Starting node management links generation"
+    fi
+
     # Get cluster nodes
     local nodes
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "🔍 Debug: Attempting to get cluster nodes with kubectl"
+    fi
+
     if ! nodes=$(kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null); then
         clean_warning "⚠️  Could not retrieve cluster nodes (kubectl permission issue)"
+        if [[ "$VERBOSE" == "true" ]]; then
+            clean_info "🔍 Debug: kubectl command failed, trying with error output:"
+            kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name
+        fi
         return 1
+    fi
+
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "🔍 Debug: kubectl succeeded, node data length: ${#nodes}"
+        clean_info "🔍 Debug: Raw nodes data: '$nodes'"
     fi
 
     if [[ -z "$nodes" ]]; then
@@ -1276,8 +1294,15 @@ generate_node_management_links() {
             local clean_node=$(printf '%s' "$node" | tr -d '\n\r')
             node_array+=("$clean_node")
             ((node_count++))
+            if [[ "$VERBOSE" == "true" ]]; then
+                clean_info "🔍 Debug: Added node #$node_count: '$clean_node'"
+            fi
         fi
     done <<< "$nodes"
+
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "🔍 Debug: Total nodes processed: $node_count"
+    fi
 
     # Display numbered list
     for i in "${!node_array[@]}"; do
