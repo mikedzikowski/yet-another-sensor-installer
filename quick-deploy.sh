@@ -22,11 +22,11 @@ set -e
 # Verbose mode (can be enabled with VERBOSE=true environment variable)
 VERBOSE=${VERBOSE:-"false"}
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[1;36m'
+# Colors for output (PowerShell theme)
+RED='\033[91m'     # Bright Red
+GREEN='\033[92m'   # Bright Green
+YELLOW='\033[93m'  # Bright Yellow
+BLUE='\033[96m'    # Bright Cyan (PowerShell's info color)
 NC='\033[0m' # No Color
 
 # Logging functions
