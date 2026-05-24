@@ -1044,6 +1044,170 @@ deploy_falcon() {
     fi
 }
 
+# Configure SHRA (Self-hosted Registry Assessment) interactively
+configure_shra_interactive() {
+    if [[ "$INSTALL_SHRA" != "true" ]]; then
+        return 0
+    fi
+
+    print_section "SHRA CONFIGURATION"
+
+    clean_info "SHRA requires registry configuration to scan container images."
+    clean_info "Let's configure your container registries for scanning..."
+    echo
+
+    # Check if running in interactive mode
+    if [[ ! -t 0 ]] && [[ "$FORCE_INTERACTIVE" != "true" ]]; then
+        clean_warning "Non-interactive environment detected for SHRA configuration."
+        clean_info "SHRA will be deployed with placeholder configuration."
+        clean_info "You'll need to manually configure registries after deployment."
+        return 0
+    fi
+
+    # Registry configuration variables
+    SHRA_REGISTRY_TYPE=""
+    SHRA_REGISTRY_HOST=""
+    SHRA_REGISTRY_USERNAME=""
+    SHRA_REGISTRY_PASSWORD=""
+    SHRA_ALLOWED_REPOS=""
+    SHRA_CRON_SCHEDULE="0 2 * * *"  # Default: Daily at 2 AM
+    SHRA_STORAGE_CLASS="default"
+
+    # Step 1: Registry type selection
+    clean_info "Step 1: Select your primary registry type to configure"
+    echo "Available registry types:"
+    echo "  1) Docker Hub"
+    echo "  2) Amazon ECR"
+    echo "  3) Azure Container Registry (ACR)"
+    echo "  4) Google Container Registry (GCR)"
+    echo "  5) Google Artifact Registry (GAR)"
+    echo "  6) Harbor"
+    echo "  7) Quay.io"
+    echo "  8) JFrog Artifactory"
+    echo "  9) Custom/Other"
+    echo
+
+    while true; do
+        read -p "Select registry type (1-9): " registry_choice
+        case $registry_choice in
+            1)
+                SHRA_REGISTRY_TYPE="dockerhub"
+                SHRA_REGISTRY_HOST="https://registry-1.docker.io"
+                break
+                ;;
+            2)
+                SHRA_REGISTRY_TYPE="ecr"
+                read -p "Enter AWS region (e.g., us-east-1): " aws_region
+                read -p "Enter AWS Account ID: " aws_account_id
+                SHRA_REGISTRY_HOST="https://${aws_account_id}.dkr.ecr.${aws_region}.amazonaws.com"
+                break
+                ;;
+            3)
+                SHRA_REGISTRY_TYPE="acr"
+                read -p "Enter ACR registry name (e.g., myregistry): " acr_name
+                SHRA_REGISTRY_HOST="https://${acr_name}.azurecr.io"
+                break
+                ;;
+            4)
+                SHRA_REGISTRY_TYPE="gcr"
+                read -p "Enter GCP project ID: " gcp_project
+                SHRA_REGISTRY_HOST="https://gcr.io/${gcp_project}"
+                break
+                ;;
+            5)
+                SHRA_REGISTRY_TYPE="gar"
+                read -p "Enter GAR region (e.g., us-central1): " gar_region
+                read -p "Enter GCP project ID: " gcp_project
+                SHRA_REGISTRY_HOST="https://${gar_region}-docker.pkg.dev/${gcp_project}"
+                break
+                ;;
+            6)
+                SHRA_REGISTRY_TYPE="harbor"
+                read -p "Enter Harbor registry URL (e.g., https://harbor.example.com): " harbor_url
+                SHRA_REGISTRY_HOST="$harbor_url"
+                break
+                ;;
+            7)
+                SHRA_REGISTRY_TYPE="quay"
+                SHRA_REGISTRY_HOST="https://quay.io"
+                break
+                ;;
+            8)
+                SHRA_REGISTRY_TYPE="artifactory"
+                read -p "Enter Artifactory URL (e.g., https://company.jfrog.io): " jfrog_url
+                SHRA_REGISTRY_HOST="$jfrog_url"
+                break
+                ;;
+            9)
+                SHRA_REGISTRY_TYPE="custom"
+                read -p "Enter custom registry URL (e.g., https://registry.example.com): " custom_url
+                SHRA_REGISTRY_HOST="$custom_url"
+                break
+                ;;
+            *)
+                clean_error "Invalid selection. Please choose 1-9."
+                continue
+                ;;
+        esac
+    done
+
+    echo
+    clean_success "Selected: $SHRA_REGISTRY_TYPE"
+    clean_info "Registry URL: $SHRA_REGISTRY_HOST"
+    echo
+
+    # Step 2: Authentication
+    clean_info "Step 2: Registry Authentication"
+    if [[ "$SHRA_REGISTRY_TYPE" == "dockerhub" ]]; then
+        clean_info "For Docker Hub, enter your Docker Hub credentials:"
+    elif [[ "$SHRA_REGISTRY_TYPE" == "ecr" ]]; then
+        clean_info "For ECR, you can use AWS credentials or ECR token:"
+        clean_info "Note: You may need to configure AWS credentials or IAM roles separately."
+    fi
+
+    read -p "Enter registry username: " SHRA_REGISTRY_USERNAME
+    read -s -p "Enter registry password/token: " SHRA_REGISTRY_PASSWORD
+    echo
+    echo
+
+    # Step 3: Repository filtering
+    clean_info "Step 3: Repository Configuration"
+    clean_info "Specify which repositories to scan (leave empty to scan all accessible repos):"
+    clean_info "Examples:"
+    clean_info "  - Docker Hub: 'library/nginx,library/alpine,myorg/*'"
+    clean_info "  - ECR: 'my-app,web-service,backend/*'"
+    clean_info "  - Empty: scan all accessible repositories"
+    echo
+    read -p "Repository filter (optional): " SHRA_ALLOWED_REPOS
+
+    # Step 4: Scan schedule
+    echo
+    clean_info "Step 4: Scanning Schedule"
+    clean_info "Configure when SHRA should scan for new images (cron format):"
+    clean_info "Examples:"
+    clean_info "  - '0 2 * * *' = Daily at 2:00 AM"
+    clean_info "  - '0 */6 * * *' = Every 6 hours"
+    clean_info "  - '0 0 * * 0' = Weekly on Sunday at midnight"
+    echo
+    read -p "Cron schedule [0 2 * * *]: " user_cron
+    if [[ -n "$user_cron" ]]; then
+        SHRA_CRON_SCHEDULE="$user_cron"
+    fi
+
+    echo
+    clean_success "SHRA configuration completed!"
+    clean_info "Registry: $SHRA_REGISTRY_TYPE ($SHRA_REGISTRY_HOST)"
+    clean_info "Username: $SHRA_REGISTRY_USERNAME"
+    clean_info "Repository filter: ${SHRA_ALLOWED_REPOS:-'All accessible repositories'}"
+    clean_info "Scan schedule: $SHRA_CRON_SCHEDULE"
+    clean_info "Storage: Automatic provisioning (default storage class)"
+    echo
+
+    # Export variables for use in deploy_shra
+    export SHRA_REGISTRY_TYPE SHRA_REGISTRY_HOST SHRA_REGISTRY_USERNAME SHRA_REGISTRY_PASSWORD
+    export SHRA_ALLOWED_REPOS SHRA_CRON_SCHEDULE
+}
+
 # Deploy SHRA (Self-hosted Registry Assessment)
 deploy_shra() {
     if [[ "$INSTALL_SHRA" != "true" ]]; then
@@ -1052,8 +1216,15 @@ deploy_shra() {
 
     print_section "FALCON SHRA DEPLOYMENT"
 
-    clean_info "SHRA requires additional configuration beyond basic deployment."
-    clean_info "Creating basic SHRA configuration with placeholder values..."
+    # Determine if we have interactive configuration or use placeholder values
+    local use_interactive_config="false"
+    if [[ -n "$SHRA_REGISTRY_TYPE" && -n "$SHRA_REGISTRY_HOST" && -n "$SHRA_REGISTRY_USERNAME" ]]; then
+        use_interactive_config="true"
+        clean_info "Using interactive SHRA configuration..."
+    else
+        clean_info "SHRA will be deployed with placeholder configuration."
+        clean_info "You'll need to configure registries after deployment."
+    fi
     echo
 
     # Check if SHRA is already deployed
@@ -1071,8 +1242,10 @@ deploy_shra() {
     # Create namespace if it doesn't exist
     kubectl create namespace "$shra_namespace" --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
 
-    # Create a basic values file for SHRA (user will need to customize)
-    cat > shra_values.yaml << EOF
+    # Generate SHRA values file - use interactive config if available, otherwise placeholders
+    if [[ "$use_interactive_config" == "true" ]]; then
+        clean_info "Generating SHRA configuration with your registry settings..."
+        cat > shra_values.yaml << EOF
 crowdstrikeConfig:
   clientID: "$FALCON_CLIENT_ID"
   clientSecret: "$FALCON_CLIENT_SECRET"
@@ -1084,13 +1257,11 @@ executor:
     tag: "${FALCON_SHRA_EXECUTOR_VERSION:-1.3.0}"
 
   dbStorage:
-    storageClass: "default"  # Update this for your cluster
     size: "1Gi"
 
   assessmentStorage:
     type: "PVC"
     pvc:
-      storageClass: "default"  # Update this for your cluster
       size: "10Gi"
 
 jobController:
@@ -1100,7 +1271,47 @@ jobController:
     tag: "${FALCON_SHRA_JOB_CONTROLLER_VERSION:-1.3.0}"
 
   dbStorage:
-    storageClass: "default"  # Update this for your cluster
+    size: "1Gi"
+
+# Configured registry settings
+registryConfigs:
+  - type: ${SHRA_REGISTRY_TYPE}
+    credentials:
+      username: "${SHRA_REGISTRY_USERNAME}"
+      password: "${SHRA_REGISTRY_PASSWORD}"
+    allowedRepositories: "${SHRA_ALLOWED_REPOS}"
+    port: "443"
+    host: "${SHRA_REGISTRY_HOST}"
+    cronSchedule: "${SHRA_CRON_SCHEDULE}"
+EOF
+    else
+        clean_info "Generating SHRA configuration with placeholder values..."
+        cat > shra_values.yaml << EOF
+crowdstrikeConfig:
+  clientID: "$FALCON_CLIENT_ID"
+  clientSecret: "$FALCON_CLIENT_SECRET"
+
+executor:
+  image:
+    registry: "registry.crowdstrike.com"
+    repository: "falcon-registryassessmentexecutor"
+    tag: "${FALCON_SHRA_EXECUTOR_VERSION:-1.3.0}"
+
+  dbStorage:
+    size: "1Gi"
+
+  assessmentStorage:
+    type: "PVC"
+    pvc:
+      size: "10Gi"
+
+jobController:
+  image:
+    registry: "registry.crowdstrike.com"
+    repository: "falcon-jobcontroller"
+    tag: "${FALCON_SHRA_JOB_CONTROLLER_VERSION:-1.3.0}"
+
+  dbStorage:
     size: "1Gi"
 
 # Example registry configuration (PLACEHOLDER - CUSTOMIZE FOR YOUR ENVIRONMENT)
@@ -1114,6 +1325,7 @@ registryConfigs:
     host: "https://registry-1.docker.io"
     cronSchedule: "0 2 * * *"  # Daily at 2 AM
 EOF
+    fi
 
     # Install or upgrade SHRA
     local helm_cmd=""
@@ -1741,6 +1953,7 @@ main() {
     add_helm_repo
     configure_gke_autopilot
     deploy_falcon
+    configure_shra_interactive
     deploy_shra
     verify_deployment
     print_success
