@@ -12,6 +12,7 @@ Deploy the complete CrowdStrike Falcon security platform on Kubernetes with a si
 - ✅ **Falcon Sensor** - Runtime protection for Kubernetes nodes
 - ✅ **Falcon Kubernetes Admission Controller (KAC)** - Policy enforcement and workload protection
 - ✅ **Falcon Image Analyzer** - Container image vulnerability scanning
+- ✅ **Falcon SHRA** - Self-hosted Registry Assessment for private registries (optional)
 
 ## 🚀 Quick Start
 
@@ -77,6 +78,7 @@ curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-ins
 export INSTALL_SENSOR=true   # Falcon Sensor (default: true)
 export INSTALL_KAC=true      # Kubernetes Admission Controller (default: true)
 export INSTALL_IAR=true      # Image Analyzer (default: true)
+export INSTALL_SHRA=false    # Self-hosted Registry Assessment (default: false)
 ```
 
 **Automation (skip interactive prompts):**
@@ -100,6 +102,7 @@ export CLUSTERNAME="your-cluster-name"                          # Kubernetes clu
 | `INSTALL_SENSOR` | `true` | Deploy Falcon Sensor for node protection |
 | `INSTALL_KAC` | `true` | Deploy Kubernetes Admission Controller |
 | `INSTALL_IAR` | `true` | Deploy Image Analyzer for container scanning |
+| `INSTALL_SHRA` | `false` | Deploy Self-hosted Registry Assessment |
 | `IS_GKE_AUTOPILOT` | `false` | Enable GKE Autopilot specific configurations |
 | `FALCON_SENSOR_MODE` | `bpf` | Sensor mode (kernel/bpf) |
 | `SKIP_VERSION_SELECTION` | `false` | Skip interactive version prompts |
@@ -110,7 +113,51 @@ export CLUSTERNAME="your-cluster-name"                          # Kubernetes clu
 export FALCON_SENSOR_VERSION="7.34.0-18708-1"     # Specific Falcon Sensor version (optional)
 export FALCON_KAC_VERSION="7.35.0-3302"           # Specific Falcon KAC version (optional)
 export FALCON_IAR_VERSION="1.0.12"                # Specific Image Analyzer version (optional)
+export FALCON_SHRA_JOB_CONTROLLER_VERSION="1.3.0" # Specific SHRA Job Controller version (optional)
+export FALCON_SHRA_EXECUTOR_VERSION="1.3.0"       # Specific SHRA Executor version (optional)
 ```
+
+## 🏗️ SHRA (Self-hosted Registry Assessment) Configuration
+
+SHRA requires additional configuration after deployment to scan your container registries:
+
+### Basic SHRA Deployment
+```bash
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="your-cluster-name"
+export INSTALL_SHRA=true
+
+./quick-deploy.sh
+```
+
+### Post-Deployment Configuration Required
+
+After SHRA is deployed, you **must** configure it for your specific registries:
+
+1. **Edit the generated configuration file**:
+   ```bash
+   # The script creates shra_values.yaml with placeholder values
+   kubectl edit configmap -n falcon-self-hosted-registry-assessment
+   ```
+
+2. **Configure registry credentials and scanning targets**:
+   - Update registry authentication (Docker Hub, ECR, ACR, GCR, etc.)
+   - Set which repositories/images to scan
+   - Configure scanning schedules (cron expressions)
+   - Adjust storage classes for your cluster
+
+3. **Supported registries**:
+   - Amazon ECR, Azure ACR, Google GCR/GAR
+   - Docker Hub, Harbor, Quay.io
+   - JFrog Artifactory, Nexus, GitLab
+   - And more...
+
+### Important Notes
+- SHRA requires persistent storage for databases and temporary image processing
+- Registry credentials are stored as Kubernetes secrets
+- Configure network policies to allow access to your registries and CrowdStrike cloud
+- Review the full documentation in `falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment/README.md`
 
 ## 🏷️ Version Selection
 

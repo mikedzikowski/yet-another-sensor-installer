@@ -1,0 +1,467 @@
+{{ include "validateValues" . }}
+{{- $name := (printf "%s" (include "falcon-kac.name" .)) -}}
+{{- $fullName := (printf "%s.%s.svc" $name (include "falcon-kac.namespace" .)) -}}
+{{- $webhookName := (printf "webhook") -}}
+{{- $webhookFullName := (printf "%s.%s.svc" $webhookName (include "falcon-kac.namespace" .)) -}}
+{{- if .Values.domainName }}
+{{- $fullName = (printf "%s.%s.svc.%s" $name (include "falcon-kac.namespace" .) .Values.domainName) -}}
+{{- $webhookFullName = (printf "%s.%s.svc.%s" $webhookName (include "falcon-kac.namespace" .) .Values.domainName) -}}
+{{- end }}
+{{- $myns := list }}
+{{- if .Values.webhook.disableNamespaces }}
+{{- $myns = split "," .Values.webhook.disableNamespaces }}
+{{- end }}
+{{- $certValid := (.Values.certExpiration | int) -}}
+{{- $altNames := list ( printf "%s" $webhookFullName ) ( printf "%s.cluster.local" $webhookFullName ) ( printf "%s.%s" $webhookName (include "falcon-kac.namespace" .)) ( printf "%s" $webhookName ) -}}
+{{- $ca := genCA ( printf "%s ca" (include "falcon-kac.namespace" .) ) $certValid -}}
+{{- $cert := genSignedCert $webhookFullName nil $altNames $certValid $ca -}}
+{{- if not .Values.autoCertificateUpdate }}
+{{- $tlscrt := (lookup "v1" "Secret" (include "falcon-kac.namespace" .) (printf "%s-tls" (include "falcon-kac.name" .))).data -}}
+{{- if kindIs "map" $tlscrt }}
+{{- $cert = dict "Cert" (index $tlscrt "tls.crt" | b64dec ) "Key" (index $tlscrt "tls.key" | b64dec ) -}}
+{{- end }}
+{{- $tlsca := (lookup "admissionregistration.k8s.io/v1" "ValidatingWebhookConfiguration" (include "falcon-kac.namespace" .) $name).webhooks -}}
+{{- if kindIs "slice" $tlsca }}
+{{- range $index, $wca := $tlsca -}}
+{{- $ca = dict "Cert" ($wca.clientConfig.caBundle | b64dec) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $tlsCert := $cert.Cert | b64enc }}
+{{- $tlsKey := $cert.Key | b64enc }}
+{{- $caCert := $ca.Cert | b64enc -}}
+{{- $falconSecretEnabled := include "falcon-kac.falconSecretEnabled" . | eq "true" }}
+{{- $falconSecretName := include "falcon-kac.falconSecretName" . }}
+{{- $imagePullSecret := include "falcon-kac.imagePullSecret" . }}
+{{- $registryConfigJson := include "falcon-kac.registryConfigJson" . }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "falcon-kac.name" . }}-tls
+  namespace: {{ include "falcon-kac.namespace" . }}
+  labels:
+    {{- include "falcon-kac.labels" . | nindent 4 }}
+type: kubernetes.io/tls
+data:
+  tls.crt: {{ $tlsCert }}
+  tls.key: {{ $tlsKey }}
+  ca.crt: {{ $caCert }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "falcon-kac.name" . }}
+  namespace: {{ include "falcon-kac.namespace" . }}
+  labels:
+    {{- include "falcon-kac.labels" . | nindent 4 }}
+    {{- if .Values.labels }}
+    {{- range $key, $value := .Values.labels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+    {{- end }}
+  {{- if .Values.annotations }}
+  annotations:
+    {{- range $key, $value := .Values.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "falcon-kac.selectorLabels" . | nindent 6 }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "falcon-kac.labels" . | nindent 8 }}
+        {{- if .Values.labels }}
+        {{- range $key, $value := .Values.labels }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+      annotations:
+        sensor.falcon-system.crowdstrike.com/injection: disabled
+        checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | quote }}
+      {{- if or (.Values.autoDeploymentUpdate) (.Values.podAnnotations) }}
+        {{- if .Values.autoDeploymentUpdate }}
+        rollme: {{ randAlphaNum 5 | quote }}
+        {{- end }}
+        {{- if .Values.podAnnotations }}
+        {{- range $key, $value := .Values.podAnnotations }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+    spec:
+    {{- if and $imagePullSecret $registryConfigJson }}
+      {{- fail "image.pullSecrets and image.registryConfigJSON cannot be used together." }}
+    {{- else -}}
+    {{- if or $imagePullSecret $registryConfigJson }}
+      imagePullSecrets:
+      {{- if $imagePullSecret }}
+        - name: {{ $imagePullSecret }}
+      {{- end }}
+      {{- if $registryConfigJson }}
+        - name: {{ include "falcon-kac.fullname" . }}-pull-secret
+      {{- end }}
+    {{- end }}
+    {{- end }}
+      containers:
+      - name: falcon-client
+        args:
+        - client
+        - "-port={{ .Values.webhookPort }}"
+        env:
+        - name: __CS_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: __CS_POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: __CS_POD_NODENAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        {{- if .Values.falconImageAnalyzerNamespace }}
+        - name: __CS_IAR_NAMESPACE
+          value: {{ .Values.falconImageAnalyzerNamespace | quote }}
+        {{- end }}
+        envFrom:
+        - configMapRef:
+            name: {{ include "falcon-kac.fullname" . }}-config
+        {{- if $falconSecretEnabled }}
+        - secretRef:
+            name: {{ $falconSecretName }}
+        {{- end }}
+        image: {{ include "falcon-kac.image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /livez
+            port: {{ .Values.webhookPort }}
+            scheme: HTTPS
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        ports:
+        - containerPort: {{ .Values.webhookPort }}
+          name: webhook-port
+        resources:
+          {{- if .Values.admissionControl.enabled }}
+          {{- toYaml .Values.falconClientResources | nindent 10 }}
+          {{- else }}
+          {{- toYaml .Values.falconClientNoWebhookResources | nindent 10 }}
+          {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        startupProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /startz
+            port: {{ .Values.webhookPort }}
+            scheme: HTTPS
+          periodSeconds: 2
+          successThreshold: 1
+          timeoutSeconds: 1
+        volumeMounts:
+        - mountPath: /run/secrets/tls
+          name: {{ include "falcon-kac.name" . }}-tls-certs
+          readOnly: true
+        - mountPath: /tmp
+          name: crowdstrike-falcon-vol0
+        - mountPath: /var/private
+          name: crowdstrike-falcon-vol1
+      - name: falcon-watcher
+        args:
+        - "client"
+        - "-app=watcher"
+        - "-http-port={{ .Values.watcherPort }}"
+        env:
+        - name: __CS_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: __CS_POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: __CS_POD_NODENAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        envFrom:
+        - configMapRef:
+            name: {{ include "falcon-kac.fullname" . }}-config
+        {{- if $falconSecretEnabled }}
+        - secretRef:
+            name: {{ $falconSecretName }}
+        {{- end }}
+        image: {{ include "falcon-kac.image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /livez
+            port: {{ .Values.watcherPort }}
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        ports:
+        - containerPort: {{ .Values.watcherPort }}
+          name: healthcheck
+        resources:
+          {{- toYaml .Values.falconWatcherResources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        startupProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /startz
+            port: {{ .Values.watcherPort }}
+            scheme: HTTP
+          periodSeconds: 2
+          successThreshold: 1
+          timeoutSeconds: 1
+        volumeMounts:
+        - mountPath: /tmp
+          name: crowdstrike-falcon-vol0
+        - mountPath: /var/private
+          name: crowdstrike-falcon-vol1
+        - mountPath: /var/falcon-watcher
+          name: crowdstrike-falcon-vol2
+      - name: falcon-ac
+        envFrom:
+        - configMapRef:
+            name: {{ include "falcon-kac.fullname" . }}-config
+        {{- if $falconSecretEnabled }}
+        - secretRef:
+            name: {{ $falconSecretName }}
+        {{- end }}
+        image: {{ include "falcon-kac.image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /livez-kac
+            port: {{ .Values.webhookPort }}
+            scheme: HTTPS
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          {{- toYaml .Values.falconAcResources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        startupProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /startz-kac
+            port: {{ .Values.webhookPort }}
+            scheme: HTTPS
+          periodSeconds: 2
+          successThreshold: 1
+          timeoutSeconds: 1
+        volumeMounts:
+        - mountPath: /tmp
+          name: crowdstrike-falcon-vol0
+        - mountPath: /var/private/
+          name: crowdstrike-falcon-vol1
+        - mountPath: /var/falcon-watcher
+          name: crowdstrike-falcon-vol2
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: system-cluster-critical
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      shareProcessNamespace: true
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: {{ default "ClusterFirstWithHostNet" .Values.dnsPolicy }}
+      {{- else if .Values.dnsPolicy}}
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      {{- end }}
+      volumes:
+      - name: {{ include "falcon-kac.name" . }}-tls-certs
+        secret:
+          secretName: {{ include "falcon-kac.name" . }}-tls
+      - name: crowdstrike-falcon-vol0
+        emptyDir:
+          sizeLimit: 256Mi
+      - name: crowdstrike-falcon-vol1
+        emptyDir:
+          sizeLimit: 4Ki
+      - name: crowdstrike-falcon-vol2
+        emptyDir:
+          sizeLimit: 64Mi
+---
+{{- if .Values.admissionControl.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating.{{ include "falcon-kac.webhookName" . }}
+  labels:
+    {{- include "falcon-kac.labels" . | nindent 4 }}
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: {{ $caCert }}
+    {{- if .Values.domainName -}}
+    url: https://{{ $webhookFullName }}:443/validate
+    {{- else }}
+    service:
+      name: webhook
+      namespace: {{ include "falcon-kac.namespace" . }}
+      path: /validate
+    {{- end }}
+  failurePolicy: {{ .Values.webhook.failurePolicy }}
+  matchPolicy: Equivalent
+  name: validating.{{ include "falcon-kac.webhookName" . }}
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - {{ include "falcon-kac.namespace" . }}
+      - kube-system
+      - kube-public
+      - falcon-system
+      - falcon-kubernetes-protection
+      {{- if $myns }}
+      {{- range $ns := $myns }}
+      - {{ $ns }}
+      {{- end -}}
+      {{- end -}}
+      {{ include "falcon-kac.openshiftNamespaces" . | nindent 6 }}
+    - key: {{ include "falcon-kac.webhookName" . }}/admission-review
+      operator: NotIn
+      values:
+      - disabled
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+    - pods/ephemeralcontainers
+    scope: '*'
+  sideEffects: None
+  timeoutSeconds: 10
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: {{ $caCert }}
+    {{- if .Values.domainName -}}
+    url: https://{{ $webhookFullName }}:443/validate
+    {{- else }}
+    service:
+      name: webhook
+      namespace: {{ include "falcon-kac.namespace" . }}
+      path: /validate
+    {{- end }}
+  failurePolicy: Ignore
+  matchPolicy: Equivalent
+  name: workload.validating.{{ include "falcon-kac.webhookName" . }}
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - {{ include "falcon-kac.namespace" . }}
+      - kube-system
+      - kube-public
+      - falcon-system
+      - falcon-kubernetes-protection
+      {{- if $myns }}
+      {{- range $ns := $myns }}
+      - {{ $ns }}
+      {{- end -}}
+      {{- end -}}
+      {{ include "falcon-kac.openshiftNamespaces" . | nindent 6 }}
+    - key: {{ include "falcon-kac.webhookName" . }}/admission-review
+      operator: NotIn
+      values:
+      - disabled
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - replicationcontrollers
+    - services
+    scope: '*'
+  - apiGroups:
+    - apps
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - daemonsets
+    - deployments
+    - replicasets
+    - statefulsets
+    scope: '*'
+  - apiGroups:
+    - batch
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - cronjobs
+    - jobs
+    scope: '*'
+  sideEffects: None
+  timeoutSeconds: 10
+{{- end }}

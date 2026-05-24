@@ -99,6 +99,7 @@ select_components() {
     INSTALL_SENSOR="${INSTALL_SENSOR:-true}"
     INSTALL_KAC="${INSTALL_KAC:-true}"
     INSTALL_IAR="${INSTALL_IAR:-true}"
+    INSTALL_SHRA="${INSTALL_SHRA:-false}"
     IS_GKE_AUTOPILOT="${IS_GKE_AUTOPILOT:-false}"
     FALCON_SENSOR_MODE="${FALCON_SENSOR_MODE:-bpf}"
 
@@ -107,6 +108,7 @@ select_components() {
     [[ "$INSTALL_SENSOR" == "true" ]] && clean_success "✅ Falcon Sensor" || clean_warning "❌ Falcon Sensor"
     [[ "$INSTALL_KAC" == "true" ]] && clean_success "✅ Falcon KAC" || clean_warning "❌ Falcon KAC"
     [[ "$INSTALL_IAR" == "true" ]] && clean_success "✅ Falcon Image Analyzer" || clean_warning "❌ Falcon Image Analyzer"
+    [[ "$INSTALL_SHRA" == "true" ]] && clean_success "✅ Falcon SHRA (Self-hosted Registry Assessment)" || clean_warning "❌ Falcon SHRA"
 
     echo
     clean_info "Cluster type:"
@@ -131,7 +133,7 @@ select_components() {
     fi
 
     # Validate at least one component is selected
-    if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" ]]; then
+    if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" && "$INSTALL_SHRA" == "false" ]]; then
         echo
         clean_error "At least one component must be selected"
         exit 1
@@ -187,10 +189,21 @@ show_available_versions() {
             echo
         fi
 
+        if [[ "$INSTALL_SHRA" == "true" ]]; then
+            clean_info "Falcon SHRA versions:"
+            clean_info "  Note: SHRA uses separate Job Controller and Executor images"
+            echo "  (Version information available in Falcon console)"
+            echo
+        fi
+
         clean_info "To use specific versions, set environment variables:"
         echo "  export FALCON_SENSOR_VERSION=\"7.34.0-18708-1\""
         echo "  export FALCON_KAC_VERSION=\"7.35.0-3302\""
         echo "  export FALCON_IAR_VERSION=\"1.0.23\""
+        if [[ "$INSTALL_SHRA" == "true" ]]; then
+            echo "  export FALCON_SHRA_JOB_CONTROLLER_VERSION=\"1.3.0\""
+            echo "  export FALCON_SHRA_EXECUTOR_VERSION=\"1.3.0\""
+        fi
         echo
     fi
 }
@@ -198,7 +211,7 @@ show_available_versions() {
 # Interactive version selection for deployment
 interactive_version_selection() {
     # Skip if environment variables are already set or if non-interactive (unless forced)
-    if [[ -n "$FALCON_SENSOR_VERSION" ]] || [[ -n "$FALCON_KAC_VERSION" ]] || [[ -n "$FALCON_IAR_VERSION" ]] || [[ "$SKIP_VERSION_SELECTION" == "true" ]]; then
+    if [[ -n "$FALCON_SENSOR_VERSION" ]] || [[ -n "$FALCON_KAC_VERSION" ]] || [[ -n "$FALCON_IAR_VERSION" ]] || [[ -n "$FALCON_SHRA_JOB_CONTROLLER_VERSION" ]] || [[ "$SKIP_VERSION_SELECTION" == "true" ]]; then
         return 0
     fi
 
@@ -903,11 +916,13 @@ deploy_falcon() {
         local existing_sensor=$(kubectl get pods -n falcon-system -l app.kubernetes.io/name=falcon-sensor >/dev/null 2>&1 && echo "true" || echo "false")
         local existing_kac=$(kubectl get pods -n falcon-kac -l app.kubernetes.io/name=falcon-kac >/dev/null 2>&1 && echo "true" || echo "false")
         local existing_iar=$(kubectl get pods -n falcon-image-analyzer -l app.kubernetes.io/name=falcon-image-analyzer >/dev/null 2>&1 && echo "true" || echo "false")
+        local existing_shra=$(kubectl get pods -n falcon-self-hosted-registry-assessment >/dev/null 2>&1 && echo "true" || echo "false")
 
         clean_info "Current deployment state:"
         [[ "$existing_sensor" == "true" ]] && clean_info "Falcon Sensor: Currently deployed" || clean_info "Falcon Sensor: Not deployed"
         [[ "$existing_kac" == "true" ]] && clean_info "Falcon KAC: Currently deployed" || clean_info "Falcon KAC: Not deployed"
         [[ "$existing_iar" == "true" ]] && clean_info "Falcon IAR: Currently deployed" || clean_info "Falcon IAR: Not deployed"
+        [[ "$existing_shra" == "true" ]] && clean_info "Falcon SHRA: Currently deployed" || clean_info "Falcon SHRA: Not deployed"
     fi
 
     # Helm chart will handle namespace creation via createComponentNamespaces=true
@@ -1027,6 +1042,126 @@ deploy_falcon() {
             exit 1
         fi
     fi
+}
+
+# Deploy SHRA (Self-hosted Registry Assessment)
+deploy_shra() {
+    if [[ "$INSTALL_SHRA" != "true" ]]; then
+        return 0
+    fi
+
+    print_section "FALCON SHRA DEPLOYMENT"
+
+    clean_info "SHRA requires additional configuration beyond basic deployment."
+    clean_info "Creating basic SHRA configuration with placeholder values..."
+    echo
+
+    # Check if SHRA is already deployed
+    local shra_namespace="falcon-self-hosted-registry-assessment"
+    local existing_shra=$(helm list -n "$shra_namespace" 2>/dev/null | grep "falcon-shra" || echo "")
+    local helm_operation="install"
+
+    if [[ -n "$existing_shra" ]]; then
+        clean_info "Found existing SHRA deployment. Upgrading..."
+        helm_operation="upgrade"
+    else
+        clean_info "No existing SHRA deployment found. Installing fresh..."
+    fi
+
+    # Create namespace if it doesn't exist
+    kubectl create namespace "$shra_namespace" --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
+
+    # Create a basic values file for SHRA (user will need to customize)
+    cat > shra_values.yaml << EOF
+crowdstrikeConfig:
+  clientID: "$FALCON_CLIENT_ID"
+  clientSecret: "$FALCON_CLIENT_SECRET"
+
+executor:
+  image:
+    registry: "registry.crowdstrike.com"
+    repository: "falcon-registryassessmentexecutor"
+    tag: "${FALCON_SHRA_EXECUTOR_VERSION:-1.3.0}"
+
+  dbStorage:
+    storageClass: "default"  # Update this for your cluster
+    size: "1Gi"
+
+  assessmentStorage:
+    type: "PVC"
+    pvc:
+      storageClass: "default"  # Update this for your cluster
+      size: "10Gi"
+
+jobController:
+  image:
+    registry: "registry.crowdstrike.com"
+    repository: "falcon-jobcontroller"
+    tag: "${FALCON_SHRA_JOB_CONTROLLER_VERSION:-1.3.0}"
+
+  dbStorage:
+    storageClass: "default"  # Update this for your cluster
+    size: "1Gi"
+
+# Example registry configuration (PLACEHOLDER - CUSTOMIZE FOR YOUR ENVIRONMENT)
+registryConfigs:
+  - type: dockerhub
+    credentials:
+      username: ""  # CONFIGURE YOUR REGISTRY CREDENTIALS
+      password: ""
+    allowedRepositories: ""  # CONFIGURE WHICH REPOS TO SCAN
+    port: "443"
+    host: "https://registry-1.docker.io"
+    cronSchedule: "0 2 * * *"  # Daily at 2 AM
+EOF
+
+    # Install or upgrade SHRA
+    local helm_cmd=""
+    if [[ "$helm_operation" == "upgrade" ]]; then
+        helm_cmd="helm upgrade falcon-shra ./falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment \
+            --namespace $shra_namespace \
+            --values shra_values.yaml"
+    else
+        helm_cmd="helm install falcon-shra ./falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment \
+            --namespace $shra_namespace \
+            --create-namespace \
+            --values shra_values.yaml"
+    fi
+
+    if [[ "$VERBOSE" == "true" ]]; then
+        clean_info "Executing SHRA deployment command:"
+        echo "$helm_cmd"
+        echo
+        if eval $helm_cmd; then
+            clean_success "SHRA deployed successfully!"
+        else
+            clean_error "Failed to deploy SHRA"
+            clean_info "This may be due to missing registry configuration."
+        fi
+    else
+        if eval $helm_cmd >/dev/null 2>&1; then
+            clean_success "SHRA deployed successfully!"
+        else
+            clean_error "Failed to deploy SHRA"
+            clean_info "This may be due to missing registry configuration."
+        fi
+    fi
+
+    echo
+    clean_warning "⚠️  IMPORTANT: SHRA Configuration Required"
+    clean_info "SHRA has been deployed with placeholder configuration."
+    clean_info "You MUST customize the configuration before it will work properly:"
+    echo
+    clean_info "1. Edit the registry credentials and settings in the deployment:"
+    clean_info "   kubectl edit configmap -n $shra_namespace"
+    echo
+    clean_info "2. Configure which registries to scan and authentication"
+    clean_info "3. Adjust storage classes for your Kubernetes cluster"
+    clean_info "4. Set up appropriate RBAC and network policies"
+    echo
+    clean_info "📖 Full documentation: falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment/README.md"
+    clean_info "🔧 Example values: shra_values.yaml (created in current directory)"
+    echo
 }
 
 # Verify deployment
@@ -1606,6 +1741,7 @@ main() {
     add_helm_repo
     configure_gke_autopilot
     deploy_falcon
+    deploy_shra
     verify_deployment
     print_success
 }

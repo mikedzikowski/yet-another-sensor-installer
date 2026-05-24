@@ -1,0 +1,180 @@
+{{- if .Values.daemonset.enabled }}
+{{- $imagePullSecret := include "falcon-image-analyzer.imagePullSecret" . }}
+{{- $registryConfigJson := include "falcon-image-analyzer.registryConfigJson" . }}
+{{- $name := (printf "%s" (include "falcon-image-analyzer.iarAgentService" .)) -}}
+{{- $iarNamespace := include "falcon-image-analyzer.namespace" . }}
+{{- $fullName := (printf "%s.%s.svc" $name $iarNamespace) -}}
+{{- if .Values.iarAgentService.domainName }}
+{{- $fullName = (printf "%s.%s.svc.%s" $name $iarNamespace .Values.domainName) -}}
+{{- end }}
+{{- $myns := list }}
+{{- $certValid := (.Values.iarAgentService.certExpiration | int) -}}
+{{- $altNames := list ( printf "%s" $fullName ) ( printf "%s.cluster.local" $fullName ) ( printf "%s.%s" $fullName $iarNamespace ) ( printf "%s" $fullName ) -}}
+{{- $ca := genCA ( printf "%s ca" $iarNamespace ) $certValid -}}
+{{- $cert := genSignedCert $fullName nil $altNames $certValid $ca -}}
+{{- if not .Values.iarAgentService.autoCertificateUpdate }}
+{{- $tlscrt := (lookup "v1" "Secret" $iarNamespace (printf "%s-tls" (include "falcon-image-analyzer.name" .))).data -}}
+{{- if kindIs "map" $tlscrt }}
+{{- $cert = dict "Cert" (index $tlscrt "tls.crt" | b64dec ) "Key" (index $tlscrt "tls.key" | b64dec ) -}}
+{{- end }}
+{{- end }}
+{{- $tlsCert := $cert.Cert | b64enc }}
+{{- $tlsKey := $cert.Key | b64enc }}
+{{- $caCert := $ca.Cert | b64enc -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "falcon-image-analyzer.name" . }}-tls
+  namespace: {{ include "falcon-image-analyzer.namespace" . }}
+  labels:
+    {{- include "falcon-image-analyzer.labels" . | nindent 4 }}
+type: kubernetes.io/tls
+data:
+  tls.crt: {{ $tlsCert }}
+  tls.key: {{ $tlsKey }}
+  ca.crt: {{ $caCert }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "falcon-image-analyzer.fullname" . }}
+  namespace: {{ include "falcon-image-analyzer.namespace" . }}
+  labels:
+    {{- include "falcon-image-analyzer.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+    {{- include "falcon-image-analyzer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        sensor.falcon-system.crowdstrike.com/injection: disabled
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+      labels:
+    {{- include "falcon-image-analyzer.labels" . | nindent 8 }}
+    spec:
+      {{- if or $imagePullSecret $registryConfigJson (.Values.crowdstrikeConfig.dockerAPIToken) }}
+      imagePullSecrets:
+        {{- if and (.Values.crowdstrikeConfig.dockerAPIToken) $registryConfigJson }}
+          {{- fail "crowdstrikeConfig.dockerAPIToken and image.registryConfigJSON cannot be used together." }}
+        {{- else -}}
+        {{ if or (.Values.crowdstrikeConfig.dockerAPIToken) $registryConfigJson }}
+        - name: {{ include "falcon-image-analyzer.fullname" . }}-pull-secret
+        {{- end }}
+        {{- end }}
+        {{- if $imagePullSecret }}
+        - name: {{ $imagePullSecret }}
+        {{- end }}
+      {{- end }}
+      serviceAccountName: {{ .Values.serviceAccount.name | default ( include "falcon-image-analyzer.fullname" . ) }}
+      securityContext:
+      {{- if .Values.podSecurityContext }}
+      {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- end }}
+      {{- if .Values.gcp.enabled }}
+      initContainers:
+        - name: {{ .Chart.Name }}-init-container
+          image: "gcr.io/google.com/cloudsdktool/google-cloud-cli:alpine"
+          imagePullPolicy: "Always"
+          command:
+            - '/bin/bash'
+            - '-c'
+            - |
+              curl -sS -H 'Metadata-Flavor: Google' 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token' --retry 30 --retry-connrefused --retry-max-time 60 --connect-timeout 3 --fail --retry-all-errors > /dev/null && exit 0 || echo 'Retry limit exceeded. Failed to wait for metadata server to be available. Check if the gke-metadata-server Pod in the kube-system namespace is healthy.' >&2; exit 1
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            privileged: false
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+          {{- include "falcon-image-analyzer.securityContext" . | nindent 12 }}
+          resources:
+          {{- if .Values.resources }}
+          {{- toYaml .Values.resources | nindent 12 }}
+          {{- end }}
+          image: {{ include "falcon-image-analyzer.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-runmode", "socket"]
+          ports:
+          - containerPort: {{ .Values.iarAgentService.httpPort }}
+            name: service-port
+          env:
+            - name: __CS_KAC_NAMESPACE
+              value: {{ .Values.kac.namespace | quote }}
+            - name: POD_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POD_NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          envFrom:
+            - configMapRef:
+                name: {{ include "falcon-image-analyzer.fullname" . }}
+            - secretRef:
+                {{- if (include "falcon-image-analyzer.falconSecretName" .) }}
+                name: {{ include "falcon-image-analyzer.falconSecretName" . }}
+                {{- else }}
+                name: {{ include "falcon-image-analyzer.fullname" . }}
+                {{- end }}
+          volumeMounts:
+          {{- (include "falcon-image-analyzer.volumeMounts" .) | nindent 12 }}
+          {{- if .Values.azure.enabled }}
+            - name: azure-config
+              mountPath: /etc/kubernetes/azure.json
+          {{- end }}
+            - mountPath: /run/secrets/tls
+              name: {{ include "falcon-image-analyzer.name" . }}-tls-certs
+              readOnly: true
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        {{- include "falcon-image-analyzer.volumes" . | nindent 8 }}
+        {{- if .Values.azure.enabled }}
+        - name: azure-config
+          hostPath:
+            path: {{ .Values.azure.azureConfig }}
+            type: File
+        {{- end }}
+        - name: {{ include "falcon-image-analyzer.name" . }}-tls-certs
+          secret:
+            secretName: {{ include "falcon-image-analyzer.name" . }}-tls
+      {{- with .Values.affinity }}
+      affinity:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      {{- if .Values.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: {{ default "ClusterFirstWithHostNet" .Values.dnsPolicy }}
+      {{- else if .Values.dnsPolicy}}
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      {{- end }}
+ {{- end }}

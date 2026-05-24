@@ -1,0 +1,19 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.DS_Store
+bin
+
+# editor and IDE paraphernalia
+.idea
+*.swp
+*.swo
+*~
+*.vscode
+
+# Unified helm chart
+charts/
+*.tgz
