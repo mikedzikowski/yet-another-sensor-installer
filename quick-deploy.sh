@@ -1319,6 +1319,54 @@ deploy_shra() {
         export SHRA_ASSESSMENT_STORAGE_SIZE="${SHRA_ASSESSMENT_STORAGE_SIZE:-10Gi}"
         export SHRA_STORAGE_CLASS="${SHRA_STORAGE_CLASS:-}"  # Auto-detected or cluster default
 
+        # Create template if it doesn't exist (for standalone script downloads)
+        if [[ ! -f "shra_values_template.yaml" ]]; then
+            cat > shra_values_template.yaml << 'EOF'
+crowdstrikeConfig:
+  clientID: "${FALCON_CLIENT_ID}"
+  clientSecret: "${FALCON_CLIENT_SECRET}"
+
+executor:
+  image:
+    registry: "registry.crowdstrike.com"
+    repository: "falcon-selfhostedregistryassessment/release/falcon-registryassessmentexecutor"
+    tag: "${FALCON_SHRA_EXECUTOR_VERSION}"
+    pullSecret: "falcon-shra-regcred"
+
+  dbStorage:
+    size: "${SHRA_DB_STORAGE_SIZE}"
+    storageClassName: "${SHRA_STORAGE_CLASS}"
+
+  assessmentStorage:
+    type: "PVC"
+    pvc:
+      size: "${SHRA_ASSESSMENT_STORAGE_SIZE}"
+      storageClassName: "${SHRA_STORAGE_CLASS}"
+
+jobController:
+  image:
+    registry: "registry.crowdstrike.com"
+    repository: "falcon-selfhostedregistryassessment/release/falcon-jobcontroller"
+    tag: "${FALCON_SHRA_JOB_CONTROLLER_VERSION}"
+    pullSecret: "falcon-shra-regcred"
+
+  dbStorage:
+    size: "${SHRA_DB_STORAGE_SIZE}"
+    storageClassName: "${SHRA_STORAGE_CLASS}"
+
+# Configured registry settings
+registryConfigs:
+  - type: "${SHRA_REGISTRY_TYPE}"
+    credentials:
+      username: "${SHRA_REGISTRY_USERNAME}"
+      password: "${SHRA_REGISTRY_PASSWORD}"
+    allowedRepositories: "${SHRA_ALLOWED_REPOS}"
+    port: "${SHRA_REGISTRY_PORT}"
+    host: "${SHRA_REGISTRY_HOST}"
+    cronSchedule: "${SHRA_CRON_SCHEDULE}"
+EOF
+        fi
+
         # Use envsubst to replace variables in template
         envsubst < shra_values_template.yaml > shra_values.yaml
 
@@ -1345,6 +1393,54 @@ deploy_shra() {
         export SHRA_DB_STORAGE_SIZE="${SHRA_DB_STORAGE_SIZE:-1Gi}"
         export SHRA_ASSESSMENT_STORAGE_SIZE="${SHRA_ASSESSMENT_STORAGE_SIZE:-10Gi}"
         export SHRA_STORAGE_CLASS="${SHRA_STORAGE_CLASS:-}"  # Auto-detected or cluster default
+
+        # Create template if it doesn't exist (for standalone script downloads)
+        if [[ ! -f "shra_values_template.yaml" ]]; then
+            cat > shra_values_template.yaml << 'EOF'
+crowdstrikeConfig:
+  clientID: "${FALCON_CLIENT_ID}"
+  clientSecret: "${FALCON_CLIENT_SECRET}"
+
+executor:
+  image:
+    registry: "registry.crowdstrike.com"
+    repository: "falcon-selfhostedregistryassessment/release/falcon-registryassessmentexecutor"
+    tag: "${FALCON_SHRA_EXECUTOR_VERSION}"
+    pullSecret: "falcon-shra-regcred"
+
+  dbStorage:
+    size: "${SHRA_DB_STORAGE_SIZE}"
+    storageClassName: "${SHRA_STORAGE_CLASS}"
+
+  assessmentStorage:
+    type: "PVC"
+    pvc:
+      size: "${SHRA_ASSESSMENT_STORAGE_SIZE}"
+      storageClassName: "${SHRA_STORAGE_CLASS}"
+
+jobController:
+  image:
+    registry: "registry.crowdstrike.com"
+    repository: "falcon-selfhostedregistryassessment/release/falcon-jobcontroller"
+    tag: "${FALCON_SHRA_JOB_CONTROLLER_VERSION}"
+    pullSecret: "falcon-shra-regcred"
+
+  dbStorage:
+    size: "${SHRA_DB_STORAGE_SIZE}"
+    storageClassName: "${SHRA_STORAGE_CLASS}"
+
+# Configured registry settings
+registryConfigs:
+  - type: "${SHRA_REGISTRY_TYPE}"
+    credentials:
+      username: "${SHRA_REGISTRY_USERNAME}"
+      password: "${SHRA_REGISTRY_PASSWORD}"
+    allowedRepositories: "${SHRA_ALLOWED_REPOS}"
+    port: "${SHRA_REGISTRY_PORT}"
+    host: "${SHRA_REGISTRY_HOST}"
+    cronSchedule: "${SHRA_CRON_SCHEDULE}"
+EOF
+        fi
 
         envsubst < shra_values_template.yaml > shra_values.yaml
 
