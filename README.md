@@ -12,7 +12,7 @@ Deploy the complete CrowdStrike Falcon security platform on Kubernetes with a si
 - ✅ **Falcon Sensor** - Runtime protection for Kubernetes nodes
 - ✅ **Falcon Kubernetes Admission Controller (KAC)** - Policy enforcement and workload protection
 - ✅ **Falcon Image Analyzer** - Container image vulnerability scanning
-- ✅ **Falcon SHRA** - Self-hosted Registry Assessment for private registries (optional)
+- 🆕 **Falcon SHRA** - Self-hosted Registry Assessment for private registries (NEW: fully automated)
 
 ## 🚀 Quick Start
 
@@ -36,10 +36,30 @@ Create OAuth client at [falcon.crowdstrike.com](https://falcon.crowdstrike.com) 
 ## 🚀 Quick Start
 
 ### Basic Deployment
+
 ```bash
 export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="your-cluster-name"
+
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash
+```
+
+### Quick SHRA Deployment (NEW)
+
+Deploy SHRA to scan your private container registries:
+
+```bash
+export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
+export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
+export CLUSTERNAME="your-cluster-name"
+
+# Enable SHRA and configure your registry
+export INSTALL_SHRA="true"
+export SHRA_REGISTRY_TYPE="acr"  # or ecr, gcr, dockerhub, etc.
+export SHRA_REGISTRY_HOST="https://myregistry.azurecr.io"
+export SHRA_REGISTRY_USERNAME="myregistry"
+export SHRA_REGISTRY_PASSWORD="your-registry-password"
 
 curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash
 ```
@@ -117,47 +137,300 @@ export FALCON_SHRA_JOB_CONTROLLER_VERSION="1.3.0" # Specific SHRA Job Controller
 export FALCON_SHRA_EXECUTOR_VERSION="1.3.0"       # Specific SHRA Executor version (optional)
 ```
 
-## 🏗️ SHRA (Self-hosted Registry Assessment) Configuration
+## 🏗️ SHRA (Self-hosted Registry Assessment)
 
-SHRA requires additional configuration after deployment to scan your container registries:
+**NEW**: Fully automated deployment with flexible configuration for any container registry and cluster!
 
-### Basic SHRA Deployment
+SHRA scans your private container registries for vulnerabilities and compliance issues. Now supports **15+ registry types** with **zero manual configuration** required after deployment.
+
+### ✨ Quick SHRA Deployment
+
+**Automated - No Manual Configuration Required:**
 ```bash
 export FALCON_CLIENT_ID="your-client-id"
 export FALCON_CLIENT_SECRET="your-client-secret"
 export CLUSTERNAME="your-cluster-name"
-export INSTALL_SHRA=true
+
+# Component Selection - SHRA only
+export INSTALL_SENSOR="false"
+export INSTALL_KAC="false"
+export INSTALL_IAR="false"
+export INSTALL_SHRA="true"
+
+# Registry Configuration - Azure ACR Example
+export SHRA_REGISTRY_TYPE="acr"
+export SHRA_REGISTRY_HOST="https://myregistry.azurecr.io"
+export SHRA_REGISTRY_USERNAME="myregistry"
+export SHRA_REGISTRY_PASSWORD="your-acr-password"
+export SHRA_CRON_SCHEDULE="0 2 * * *"  # Daily at 2 AM
 
 ./quick-deploy.sh
 ```
 
-### Post-Deployment Configuration Required
+### 🔧 Advanced SHRA Configuration
 
-After SHRA is deployed, you **must** configure it for your specific registries:
+**All Configuration Options:**
+```bash
+# Required: CrowdStrike & Cluster
+export FALCON_CLIENT_ID="your-client-id"
+export FALCON_CLIENT_SECRET="your-client-secret"
+export CLUSTERNAME="your-cluster-name"
+export INSTALL_SHRA="true"
 
-1. **Edit the generated configuration file**:
-   ```bash
-   # The script creates shra_values.yaml with placeholder values
-   kubectl edit configmap -n falcon-self-hosted-registry-assessment
-   ```
+# Registry Configuration (Required)
+export SHRA_REGISTRY_TYPE="acr"                           # See supported types below
+export SHRA_REGISTRY_HOST="https://myregistry.azurecr.io" # Registry URL
+export SHRA_REGISTRY_USERNAME="username"                  # Registry username
+export SHRA_REGISTRY_PASSWORD="password-or-token"         # Registry password/token
+export SHRA_REGISTRY_PORT="443"                          # Default: 443
 
-2. **Configure registry credentials and scanning targets**:
-   - Update registry authentication (Docker Hub, ECR, ACR, GCR, etc.)
-   - Set which repositories/images to scan
-   - Configure scanning schedules (cron expressions)
-   - Adjust storage classes for your cluster
+# Scanning Configuration (Optional)
+export SHRA_ALLOWED_REPOS="prod/*,shared/*"              # Repo patterns (empty = all)
+export SHRA_CRON_SCHEDULE="0 2 * * *"                   # Default: Daily at 2 AM
 
-3. **Supported registries**:
-   - Amazon ECR, Azure ACR, Google GCR/GAR
-   - Docker Hub, Harbor, Quay.io
-   - JFrog Artifactory, Nexus, GitLab
-   - And more...
+# Storage Configuration (Optional - Auto-detected)
+export SHRA_STORAGE_CLASS="managed-premium"              # Auto-detected if not set
+export SHRA_DB_STORAGE_SIZE="2Gi"                       # Default: 1Gi
+export SHRA_ASSESSMENT_STORAGE_SIZE="20Gi"              # Default: 10Gi
 
-### Important Notes
-- SHRA requires persistent storage for databases and temporary image processing
-- Registry credentials are stored as Kubernetes secrets
-- Configure network policies to allow access to your registries and CrowdStrike cloud
-- Review the full documentation in `falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment/README.md`
+# Version Control (Optional - Uses latest)
+export FALCON_SHRA_EXECUTOR_VERSION="1.7.0"             # Default: latest
+export FALCON_SHRA_JOB_CONTROLLER_VERSION="1.7.0"       # Default: latest
+```
+
+### 🏭 Supported Container Registries
+
+| Registry Type | `SHRA_REGISTRY_TYPE` | Example Host |
+|---------------|---------------------|--------------|
+| **Amazon ECR** | `ecr` | `https://123456789.dkr.ecr.us-east-1.amazonaws.com` |
+| **Azure ACR** | `acr` | `https://myregistry.azurecr.io` |
+| **Google GCR** | `gcr` | `https://gcr.io/my-project` |
+| **Google GAR** | `gar` | `https://us-central1-docker.pkg.dev/my-project` |
+| **Docker Hub** | `dockerhub` | `https://registry-1.docker.io` |
+| **Harbor** | `harbor` | `https://harbor.company.com` |
+| **Quay.io** | `quay` | `https://quay.io` |
+| **JFrog Artifactory** | `artifactory` | `https://company.jfrog.io` |
+| **Sonatype Nexus** | `nexus` | `https://nexus.company.com` |
+| **GitLab Registry** | `gitlab` | `https://registry.gitlab.com` |
+| **GitHub Registry** | `github` | `https://ghcr.io` |
+| **Custom Registry** | `custom` | `https://registry.example.com` |
+
+### 📋 Real-World Examples
+
+**AWS ECR Production Setup:**
+```bash
+export SHRA_REGISTRY_TYPE="ecr"
+export SHRA_REGISTRY_HOST="https://123456789.dkr.ecr.us-east-1.amazonaws.com"
+export SHRA_REGISTRY_USERNAME="AWS"
+export SHRA_REGISTRY_PASSWORD="your-ecr-token"
+export SHRA_ALLOWED_REPOS="prod/*,shared/*"
+export SHRA_STORAGE_CLASS="gp3"
+export SHRA_ASSESSMENT_STORAGE_SIZE="50Gi"  # Large registry
+```
+
+**Azure ACR Enterprise Setup:**
+```bash
+export SHRA_REGISTRY_TYPE="acr"
+export SHRA_REGISTRY_HOST="https://companyregistry.azurecr.io"
+export SHRA_REGISTRY_USERNAME="companyregistry"
+export SHRA_REGISTRY_PASSWORD="your-acr-service-principal-password"
+export SHRA_CRON_SCHEDULE="0 */6 * * *"  # Every 6 hours
+export SHRA_STORAGE_CLASS="managed-premium"
+```
+
+**Google GCR Setup:**
+```bash
+export SHRA_REGISTRY_TYPE="gcr"
+export SHRA_REGISTRY_HOST="https://gcr.io/my-company-project"
+export SHRA_REGISTRY_USERNAME="_json_key"
+export SHRA_REGISTRY_PASSWORD="$(cat /path/to/service-account.json)"
+export SHRA_STORAGE_CLASS="ssd"
+```
+
+**Harbor Self-Hosted Setup:**
+```bash
+export SHRA_REGISTRY_TYPE="harbor"
+export SHRA_REGISTRY_HOST="https://harbor.company.com"
+export SHRA_REGISTRY_USERNAME="robot-account"
+export SHRA_REGISTRY_PASSWORD="robot-token"
+export SHRA_ALLOWED_REPOS="public/*,team-a/*,team-b/*"
+```
+
+**Docker Hub Multi-Repository:**
+```bash
+export SHRA_REGISTRY_TYPE="dockerhub"
+export SHRA_REGISTRY_HOST="https://registry-1.docker.io"
+export SHRA_REGISTRY_USERNAME="your-dockerhub-username"
+export SHRA_REGISTRY_PASSWORD="your-dockerhub-access-token"
+export SHRA_ALLOWED_REPOS="library/nginx,library/alpine,myusername/*"
+```
+
+### 🚀 Cross-Cloud Deployment Examples
+
+**AWS EKS with ECR:**
+```bash
+export CLUSTERNAME="eks-production"
+export SHRA_REGISTRY_TYPE="ecr"
+export SHRA_STORAGE_CLASS="gp3"  # or auto-detected
+```
+
+**Azure AKS with ACR:**
+```bash
+export CLUSTERNAME="aks-production"
+export SHRA_REGISTRY_TYPE="acr"
+export SHRA_STORAGE_CLASS="managed-premium"  # or auto-detected
+```
+
+**Google GKE with GCR:**
+```bash
+export CLUSTERNAME="gke-production"
+export SHRA_REGISTRY_TYPE="gcr"
+export SHRA_STORAGE_CLASS="ssd"  # or auto-detected
+```
+
+### ⚙️ Smart Auto-Configuration
+
+**Storage Class Auto-Detection:**
+- Automatically detects available storage classes in your cluster
+- Prioritizes: `gp2`, `gp3`, `standard`, `ssd`, `fast`, `premium-lrs`, `managed-premium`
+- Falls back to first available if none of the priority classes exist
+- Uses cluster default if detection fails
+
+**Cross-Platform Compatibility:**
+- **AWS EKS**: Auto-detects `gp2`/`gp3` storage
+- **Azure AKS**: Auto-detects `default`/`managed-premium` storage
+- **Google GKE**: Auto-detects `standard`/`ssd` storage
+- **On-premise**: Uses first available storage class
+
+### 📊 Repository Filtering Examples
+
+**Scan Specific Repositories:**
+```bash
+export SHRA_ALLOWED_REPOS="production/*,shared/base-images"  # Only prod and shared base images
+export SHRA_ALLOWED_REPOS="myapp-*"                         # All repos starting with myapp-
+export SHRA_ALLOWED_REPOS="library/nginx,library/alpine"    # Specific Docker Hub images
+```
+
+**Scan All Repositories:**
+```bash
+export SHRA_ALLOWED_REPOS=""  # Empty = scan everything accessible
+```
+
+### 🕒 Scanning Schedule Examples
+
+```bash
+export SHRA_CRON_SCHEDULE="0 2 * * *"      # Daily at 2 AM (default)
+export SHRA_CRON_SCHEDULE="0 */6 * * *"    # Every 6 hours
+export SHRA_CRON_SCHEDULE="0 9 * * 1"      # Monday at 9 AM (weekly)
+export SHRA_CRON_SCHEDULE="*/30 * * * *"   # Every 30 minutes (testing)
+export SHRA_CRON_SCHEDULE="0 22 * * 0"     # Sunday at 10 PM (weekly)
+```
+
+### 💾 Storage Configuration Examples
+
+**Development/Small Registries:**
+```bash
+export SHRA_DB_STORAGE_SIZE="500Mi"
+export SHRA_ASSESSMENT_STORAGE_SIZE="5Gi"
+```
+
+**Production/Large Registries:**
+```bash
+export SHRA_DB_STORAGE_SIZE="5Gi"
+export SHRA_ASSESSMENT_STORAGE_SIZE="100Gi"
+```
+
+**High-Performance Setup:**
+```bash
+export SHRA_STORAGE_CLASS="managed-premium"  # SSD storage
+export SHRA_DB_STORAGE_SIZE="2Gi"
+export SHRA_ASSESSMENT_STORAGE_SIZE="50Gi"
+```
+
+### ✅ Deployment Verification
+
+**Check SHRA Status:**
+```bash
+# Check SHRA pods
+kubectl get pods -n falcon-self-hosted-registry-assessment
+
+# Check SHRA logs
+kubectl logs -n falcon-self-hosted-registry-assessment falcon-shra-job-controller-0
+kubectl logs -n falcon-self-hosted-registry-assessment falcon-shra-executor-0
+
+# Check SHRA storage
+kubectl get pvc -n falcon-self-hosted-registry-assessment
+
+# Check SHRA configuration
+kubectl get configmap -n falcon-self-hosted-registry-assessment
+```
+
+**Expected SHRA Output:**
+```
+NAME                           READY   STATUS    RESTARTS   AGE
+falcon-shra-executor-0         1/1     Running   0          5m
+falcon-shra-job-controller-0   1/1     Running   0          5m
+```
+
+### 🔒 Security & Best Practices
+
+**Configuration File Security:**
+```bash
+# Use configuration file approach for security
+cp shra_config_examples.env my_shra_config.env
+# Edit my_shra_config.env with your actual values
+source my_shra_config.env
+./quick-deploy.sh
+
+# Add to .gitignore
+echo "my_shra_config.env" >> .gitignore
+```
+
+**Credential Management:**
+- Never commit real credentials to version control
+- Use environment-specific config files (dev, staging, prod)
+- Consider using Kubernetes secrets for credentials
+- Regularly rotate registry credentials
+- Use least-privilege access for registry accounts
+
+### 🚨 SHRA Troubleshooting
+
+**Pod Issues:**
+```bash
+# Check pod status
+kubectl describe pods -n falcon-self-hosted-registry-assessment
+
+# Check events
+kubectl get events -n falcon-self-hosted-registry-assessment --sort-by='.lastTimestamp'
+
+# Check storage issues
+kubectl describe pvc -n falcon-self-hosted-registry-assessment
+```
+
+**Registry Connectivity:**
+```bash
+# Test registry connectivity
+kubectl exec -n falcon-self-hosted-registry-assessment falcon-shra-executor-0 -- nslookup your-registry-host
+
+# Check registry credentials
+kubectl get secrets -n falcon-self-hosted-registry-assessment
+```
+
+**Storage Issues:**
+```bash
+# Check available storage classes
+kubectl get storageclass
+
+# Check PVC status
+kubectl get pvc -n falcon-self-hosted-registry-assessment -o wide
+```
+
+### 📖 Advanced Configuration
+
+For advanced SHRA configuration options, see:
+- `shra_config_examples.env` - Comprehensive configuration examples
+- `falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment/README.md` - Official documentation
+- CrowdStrike Falcon console - SHRA dashboard and results
 
 ## 🏷️ Version Selection
 
@@ -203,11 +476,16 @@ kubectl get deployments,daemonsets -A | grep falcon
 ```
 
 ### Expected Output
-```
+```bash
+# Standard deployment
 NAMESPACE               NAME                                          READY   STATUS    RESTARTS   AGE
 falcon-image-analyzer   falcon-platform-falcon-image-analyzer-xxx    1/1     Running   0          2m
 falcon-kac              falcon-kac-xxx-xxx                           3/3     Running   0          2m
 falcon-system           falcon-platform-falcon-sensor-xxx            1/1     Running   0          2m
+
+# With SHRA enabled
+falcon-self-hosted-registry-assessment   falcon-shra-executor-0         1/1     Running   0          2m
+falcon-self-hosted-registry-assessment   falcon-shra-job-controller-0   1/1     Running   0          2m
 ```
 
 ## 🗑️ Cleanup
@@ -219,8 +497,8 @@ curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-ins
 
 The script automatically removes:
 - Falcon Platform umbrella chart deployments
-- Individual component releases (falcon-sensor, falcon-kac, falcon-image-analyzer)
-- All related namespaces and resources
+- Individual component releases (falcon-sensor, falcon-kac, falcon-image-analyzer, falcon-shra)
+- All related namespaces and resources (including falcon-self-hosted-registry-assessment)
 - Webhook configurations and CRDs
 - GKE Autopilot AllowlistSynchronizers
 

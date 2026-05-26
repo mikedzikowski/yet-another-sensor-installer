@@ -1,0 +1,18 @@
+# SHRA Configuration Files with Secrets
+shra_values_*.yaml
+!shra_values_template.yaml
+
+# Temporary files
+/tmp/
+*.tmp
+
+# Credentials and sensitive files
+*credentials*
+*secrets*
+*.env
+*.key
+*.pem
+
+# Docker config files
+.dockerconfigjson
+dockerconfig.json

@@ -1044,6 +1044,48 @@ deploy_falcon() {
     fi
 }
 
+# Detect available storage classes and set appropriate defaults
+detect_storage_class() {
+    local detected_class=""
+
+    # Get available storage classes, prioritizing common ones
+    local storage_classes=$(kubectl get storageclass -o name 2>/dev/null | sed 's/storageclass.storage.k8s.io\///' | sort)
+
+    if [[ -z "$storage_classes" ]]; then
+        clean_warning "No storage classes found in cluster"
+        return 1
+    fi
+
+    # Check for default storage class first
+    local default_class=$(kubectl get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}' 2>/dev/null)
+
+    if [[ -n "$default_class" ]]; then
+        detected_class="$default_class"
+        clean_info "Using default storage class: $detected_class"
+    else
+        # Priority order for common storage classes
+        local priority_classes=("gp2" "gp3" "standard" "ssd" "fast" "premium-lrs" "managed-premium")
+
+        for priority_class in "${priority_classes[@]}"; do
+            if echo "$storage_classes" | grep -q "^${priority_class}$"; then
+                detected_class="$priority_class"
+                clean_info "Using detected storage class: $detected_class"
+                break
+            fi
+        done
+
+        # If no priority class found, use the first available
+        if [[ -z "$detected_class" ]]; then
+            detected_class=$(echo "$storage_classes" | head -n1)
+            clean_info "Using first available storage class: $detected_class"
+        fi
+    fi
+
+    # Export the detected storage class
+    export SHRA_STORAGE_CLASS="$detected_class"
+    return 0
+}
+
 # Configure SHRA (Self-hosted Registry Assessment) interactively
 configure_shra_interactive() {
     if [[ "$INSTALL_SHRA" != "true" ]]; then
@@ -1056,11 +1098,21 @@ configure_shra_interactive() {
     clean_info "Let's configure your container registries for scanning..."
     echo
 
+    # Detect storage class if not set
+    if [[ -z "$SHRA_STORAGE_CLASS" ]]; then
+        clean_info "Auto-detecting storage class..."
+        if ! detect_storage_class; then
+            clean_warning "Storage class detection failed. Using cluster default."
+            SHRA_STORAGE_CLASS=""  # Let Kubernetes use cluster default
+        fi
+    fi
+
     # Check if running in interactive mode
     if [[ ! -t 0 ]] && [[ "$FORCE_INTERACTIVE" != "true" ]]; then
-        clean_warning "Non-interactive environment detected for SHRA configuration."
+        clean_info "Non-interactive environment detected for SHRA configuration."
         clean_info "SHRA will be deployed with placeholder configuration."
         clean_info "You'll need to manually configure registries after deployment."
+        # Storage class is already detected above, so we can return here
         return 0
     fi
 
@@ -1071,7 +1123,6 @@ configure_shra_interactive() {
     SHRA_REGISTRY_PASSWORD=""
     SHRA_ALLOWED_REPOS=""
     SHRA_CRON_SCHEDULE="0 2 * * *"  # Default: Daily at 2 AM
-    SHRA_STORAGE_CLASS="default"
 
     # Step 1: Registry type selection
     clean_info "Step 1: Select your primary registry type to configure"
@@ -1242,89 +1293,138 @@ deploy_shra() {
     # Create namespace if it doesn't exist
     kubectl create namespace "$shra_namespace" --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1
 
-    # Generate SHRA values file - use interactive config if available, otherwise placeholders
+    # Generate SHRA values file from template using environment variables
     if [[ "$use_interactive_config" == "true" ]]; then
-        clean_info "Generating SHRA configuration with your registry settings..."
-        cat > shra_values.yaml << EOF
-crowdstrikeConfig:
-  clientID: "$FALCON_CLIENT_ID"
-  clientSecret: "$FALCON_CLIENT_SECRET"
+        clean_info "Generating SHRA configuration from template using your registry settings..."
+        # Ensure all SHRA environment variables have values with flexible defaults
+        export SHRA_REGISTRY_TYPE="${SHRA_REGISTRY_TYPE:-acr}"
+        export SHRA_REGISTRY_HOST="${SHRA_REGISTRY_HOST:-https://registry-1.docker.io}"
+        export SHRA_REGISTRY_USERNAME="${SHRA_REGISTRY_USERNAME:-}"
+        export SHRA_REGISTRY_PASSWORD="${SHRA_REGISTRY_PASSWORD:-}"
+        export SHRA_ALLOWED_REPOS="${SHRA_ALLOWED_REPOS:-}"
+        export SHRA_CRON_SCHEDULE="${SHRA_CRON_SCHEDULE:-0 2 * * *}"
+        export SHRA_REGISTRY_PORT="${SHRA_REGISTRY_PORT:-443}"
 
-executor:
-  image:
-    registry: "registry.crowdstrike.com"
-    repository: "falcon-registryassessmentexecutor"
-    tag: "${FALCON_SHRA_EXECUTOR_VERSION:-1.3.0}"
+        # Flexible configuration options - use environment variables or defaults (now required)
+        export FALCON_SHRA_EXECUTOR_VERSION="${FALCON_SHRA_EXECUTOR_VERSION:-1.7.0}"
+        export FALCON_SHRA_JOB_CONTROLLER_VERSION="${FALCON_SHRA_JOB_CONTROLLER_VERSION:-1.7.0}"
+        export SHRA_DB_STORAGE_SIZE="${SHRA_DB_STORAGE_SIZE:-1Gi}"
+        export SHRA_ASSESSMENT_STORAGE_SIZE="${SHRA_ASSESSMENT_STORAGE_SIZE:-10Gi}"
+        export SHRA_STORAGE_CLASS="${SHRA_STORAGE_CLASS:-}"  # Auto-detected or cluster default
 
-  dbStorage:
-    size: "1Gi"
+        # Use envsubst to replace variables in template
+        envsubst < shra_values_template.yaml > shra_values.yaml
 
-  assessmentStorage:
-    type: "PVC"
-    pvc:
-      size: "10Gi"
-
-jobController:
-  image:
-    registry: "registry.crowdstrike.com"
-    repository: "falcon-jobcontroller"
-    tag: "${FALCON_SHRA_JOB_CONTROLLER_VERSION:-1.3.0}"
-
-  dbStorage:
-    size: "1Gi"
-
-# Configured registry settings
-registryConfigs:
-  - type: ${SHRA_REGISTRY_TYPE}
-    credentials:
-      username: "${SHRA_REGISTRY_USERNAME}"
-      password: "${SHRA_REGISTRY_PASSWORD}"
-    allowedRepositories: "${SHRA_ALLOWED_REPOS}"
-    port: "443"
-    host: "${SHRA_REGISTRY_HOST}"
-    cronSchedule: "${SHRA_CRON_SCHEDULE}"
-EOF
+        # Post-process the generated file to handle empty storage class
+        if [[ -z "$SHRA_STORAGE_CLASS" ]]; then
+            # Remove empty storageClassName lines to use cluster default
+            sed -i '/storageClassName: ""/d' shra_values.yaml
+            sed -i '/storageClassName:$/d' shra_values.yaml
+        fi
     else
         clean_info "Generating SHRA configuration with placeholder values..."
-        cat > shra_values.yaml << EOF
-crowdstrikeConfig:
-  clientID: "$FALCON_CLIENT_ID"
-  clientSecret: "$FALCON_CLIENT_SECRET"
+        # Set placeholder defaults for template
+        export SHRA_REGISTRY_TYPE="dockerhub"
+        export SHRA_REGISTRY_HOST="https://registry-1.docker.io"
+        export SHRA_REGISTRY_USERNAME=""
+        export SHRA_REGISTRY_PASSWORD=""
+        export SHRA_ALLOWED_REPOS=""
+        export SHRA_CRON_SCHEDULE="0 2 * * *"
+        export SHRA_REGISTRY_PORT="443"
 
-executor:
-  image:
-    registry: "registry.crowdstrike.com"
-    repository: "falcon-registryassessmentexecutor"
-    tag: "${FALCON_SHRA_EXECUTOR_VERSION:-1.3.0}"
+        # Flexible configuration options with safe defaults (now required)
+        export FALCON_SHRA_EXECUTOR_VERSION="${FALCON_SHRA_EXECUTOR_VERSION:-1.7.0}"
+        export FALCON_SHRA_JOB_CONTROLLER_VERSION="${FALCON_SHRA_JOB_CONTROLLER_VERSION:-1.7.0}"
+        export SHRA_DB_STORAGE_SIZE="${SHRA_DB_STORAGE_SIZE:-1Gi}"
+        export SHRA_ASSESSMENT_STORAGE_SIZE="${SHRA_ASSESSMENT_STORAGE_SIZE:-10Gi}"
+        export SHRA_STORAGE_CLASS="${SHRA_STORAGE_CLASS:-}"  # Auto-detected or cluster default
 
-  dbStorage:
-    size: "1Gi"
+        envsubst < shra_values_template.yaml > shra_values.yaml
 
-  assessmentStorage:
-    type: "PVC"
-    pvc:
-      size: "10Gi"
+        # Post-process the generated file to handle empty storage class
+        if [[ -z "$SHRA_STORAGE_CLASS" ]]; then
+            # Remove empty storageClassName lines to use cluster default
+            sed -i '/storageClassName: ""/d' shra_values.yaml
+            sed -i '/storageClassName:$/d' shra_values.yaml
+        fi
 
-jobController:
-  image:
-    registry: "registry.crowdstrike.com"
-    repository: "falcon-jobcontroller"
-    tag: "${FALCON_SHRA_JOB_CONTROLLER_VERSION:-1.3.0}"
+        # Add warning comment to generated file
+        sed -i '1i# WARNING: This file contains placeholder values. Update with your actual registry credentials.' shra_values.yaml
+        sed -i '2i# DO NOT commit files with real credentials to version control!' shra_values.yaml
+        sed -i '3i\
+' shra_values.yaml
+    fi
 
-  dbStorage:
-    size: "1Gi"
+    # Create proper Docker registry credentials for SHRA image pulls
+    clean_info "Creating Docker registry credentials for SHRA..."
 
-# Example registry configuration (PLACEHOLDER - CUSTOMIZE FOR YOUR ENVIRONMENT)
-registryConfigs:
-  - type: dockerhub
-    credentials:
-      username: ""  # CONFIGURE YOUR REGISTRY CREDENTIALS
-      password: ""
-    allowedRepositories: ""  # CONFIGURE WHICH REPOS TO SCAN
-    port: "443"
-    host: "https://registry-1.docker.io"
-    cronSchedule: "0 2 * * *"  # Daily at 2 AM
-EOF
+    # Download falcon-container-sensor-pull script if not present
+    if [[ ! -f "falcon-container-sensor-pull.sh" ]]; then
+        clean_info "Downloading CrowdStrike registry credential script..."
+        if ! curl -s -L -o falcon-container-sensor-pull.sh \
+            "https://raw.githubusercontent.com/CrowdStrike/falcon-scripts/main/bash/containers/falcon-container-sensor-pull/falcon-container-sensor-pull.sh"; then
+            clean_error "Failed to download registry credential script"
+            return 1
+        fi
+        chmod +x falcon-container-sensor-pull.sh
+    fi
+
+    # Generate proper Docker registry credentials using the official script
+    if ! docker_registry_token=$(./falcon-container-sensor-pull.sh -t falcon-jobcontroller -u "$FALCON_CLIENT_ID" -s "$FALCON_CLIENT_SECRET" --get-pull-token 2>/dev/null); then
+        clean_error "Failed to generate Docker registry credentials"
+        clean_info "Ensure your FALCON_CLIENT_ID and FALCON_CLIENT_SECRET have the required API scopes"
+        return 1
+    fi
+
+    # Extract username and password from the token
+    if ! docker_config=$(echo "$docker_registry_token" | base64 -d 2>/dev/null); then
+        clean_error "Failed to decode Docker registry token"
+        return 1
+    fi
+
+    # Parse the Docker config JSON to extract auth credentials
+    if ! auth_string=$(echo "$docker_config" | grep -o '"auth": *"[^"]*"' | cut -d'"' -f4); then
+        clean_error "Failed to extract auth credentials from Docker config"
+        return 1
+    fi
+
+    # Decode the base64 auth string to get username:password
+    if ! credentials=$(echo "$auth_string" | base64 -d 2>/dev/null); then
+        clean_error "Failed to decode auth credentials"
+        return 1
+    fi
+
+    # Split username and password
+    docker_username=$(echo "$credentials" | cut -d':' -f1)
+    docker_password=$(echo "$credentials" | cut -d':' -f2)
+
+    if [[ -z "$docker_username" || -z "$docker_password" ]]; then
+        clean_error "Failed to parse Docker registry credentials"
+        return 1
+    fi
+
+    clean_success "Docker registry credentials generated successfully"
+
+    # Create the pull secret with proper Docker registry credentials
+    if kubectl create secret docker-registry falcon-shra-regcred \
+        --docker-server=registry.crowdstrike.com \
+        --docker-username="$docker_username" \
+        --docker-password="$docker_password" \
+        -n "$shra_namespace" 2>/dev/null; then
+        clean_success "Created Docker registry pull secret"
+    else
+        # Secret might already exist, try to update it
+        kubectl delete secret falcon-shra-regcred -n "$shra_namespace" --ignore-not-found
+        if kubectl create secret docker-registry falcon-shra-regcred \
+            --docker-server=registry.crowdstrike.com \
+            --docker-username="$docker_username" \
+            --docker-password="$docker_password" \
+            -n "$shra_namespace"; then
+            clean_success "Updated Docker registry pull secret"
+        else
+            clean_error "Failed to create Docker registry pull secret"
+            return 1
+        fi
     fi
 
     # Install or upgrade SHRA
@@ -1742,7 +1842,7 @@ cleanup_deployment() {
 
     # Get all releases and filter for any falcon-related ones
     while IFS= read -r release_line; do
-        if [[ -n "$release_line" && ("$release_line" == *"falcon-platform"* || "$release_line" == *"falcon-kac"* || "$release_line" == *"falcon-sensor"* || "$release_line" == *"falcon-helm"* || "$release_line" == *"falcon-image-analyzer"*) ]]; then
+        if [[ -n "$release_line" && ("$release_line" == *"falcon-platform"* || "$release_line" == *"falcon-kac"* || "$release_line" == *"falcon-sensor"* || "$release_line" == *"falcon-helm"* || "$release_line" == *"falcon-image-analyzer"* || "$release_line" == *"falcon-shra"*) ]]; then
             releases_found=true
             local release_name=$(echo "$release_line" | awk '{print $1}')
             local release_ns=$(echo "$release_line" | awk '{print $2}')
@@ -1760,7 +1860,7 @@ cleanup_deployment() {
 
     # Remove namespaces with timeout
     clean_info "Removing Falcon namespaces..."
-    kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer --ignore-not-found --timeout=60s 2>/dev/null || {
+    kubectl delete namespace falcon-platform falcon-system falcon-kac falcon-image-analyzer falcon-self-hosted-registry-assessment --ignore-not-found --timeout=60s 2>/dev/null || {
         clean_warning "Some namespaces may take longer to delete (stuck finalizers)"
     }
 

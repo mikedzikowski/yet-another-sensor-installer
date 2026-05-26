@@ -1,0 +1,42 @@
+crowdstrikeConfig:
+  clientID: "${FALCON_CLIENT_ID}"
+  clientSecret: "${FALCON_CLIENT_SECRET}"
+
+executor:
+  image:
+    registry: "registry.crowdstrike.com"
+    repository: "falcon-selfhostedregistryassessment/release/falcon-registryassessmentexecutor"
+    tag: "${FALCON_SHRA_EXECUTOR_VERSION}"
+    pullSecret: "falcon-shra-regcred"
+
+  dbStorage:
+    size: "${SHRA_DB_STORAGE_SIZE}"
+    storageClassName: "${SHRA_STORAGE_CLASS}"
+
+  assessmentStorage:
+    type: "PVC"
+    pvc:
+      size: "${SHRA_ASSESSMENT_STORAGE_SIZE}"
+      storageClassName: "${SHRA_STORAGE_CLASS}"
+
+jobController:
+  image:
+    registry: "registry.crowdstrike.com"
+    repository: "falcon-selfhostedregistryassessment/release/falcon-jobcontroller"
+    tag: "${FALCON_SHRA_JOB_CONTROLLER_VERSION}"
+    pullSecret: "falcon-shra-regcred"
+
+  dbStorage:
+    size: "${SHRA_DB_STORAGE_SIZE}"
+    storageClassName: "${SHRA_STORAGE_CLASS}"
+
+# Configured registry settings
+registryConfigs:
+  - type: "${SHRA_REGISTRY_TYPE}"
+    credentials:
+      username: "${SHRA_REGISTRY_USERNAME}"
+      password: "${SHRA_REGISTRY_PASSWORD}"
+    allowedRepositories: "${SHRA_ALLOWED_REPOS}"
+    port: "${SHRA_REGISTRY_PORT}"
+    host: "${SHRA_REGISTRY_HOST}"
+    cronSchedule: "${SHRA_CRON_SCHEDULE}"
