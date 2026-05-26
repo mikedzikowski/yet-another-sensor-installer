@@ -42,7 +42,7 @@ export FALCON_CLIENT_ID="your-falcon-oauth-client-id"
 export FALCON_CLIENT_SECRET="your-falcon-oauth-client-secret"
 export CLUSTERNAME="your-cluster-name"
 
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/feature/shra-automation-clean/quick-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash
 ```
 
 ### Quick SHRA Deployment (NEW)
@@ -61,7 +61,7 @@ export SHRA_REGISTRY_HOST="https://myregistry.azurecr.io"
 export SHRA_REGISTRY_USERNAME="myregistry"
 export SHRA_REGISTRY_PASSWORD="your-registry-password"
 
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/feature/shra-automation-clean/quick-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash
 ```
 
 ### Complete Falcon Platform with SHRA
@@ -80,7 +80,7 @@ export SHRA_REGISTRY_HOST="https://myregistry.azurecr.io"
 export SHRA_REGISTRY_USERNAME="myregistry"
 export SHRA_REGISTRY_PASSWORD="your-registry-password"
 
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/feature/shra-automation-clean/quick-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash
 ```
 
 ### SHRA-Only Deployment
@@ -105,7 +105,7 @@ export SHRA_REGISTRY_USERNAME="AWS"
 export SHRA_REGISTRY_PASSWORD="your-ecr-token"
 export SHRA_CRON_SCHEDULE="0 2 * * *"  # Daily at 2 AM
 
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/feature/shra-automation-clean/quick-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash
 ```
 
 ### Interactive Version Selection
@@ -536,7 +536,7 @@ falcon-self-hosted-registry-assessment   falcon-shra-job-controller-0   1/1     
 
 ### Automated Cleanup (Recommended)
 ```bash
-curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/feature/shra-automation-clean/quick-deploy.sh | bash -s cleanup
+curl -sSL https://raw.githubusercontent.com/mikedzikowski/yet-another-sensor-installer/main/quick-deploy.sh | bash -s cleanup
 ```
 
 The script automatically removes:
