@@ -1099,6 +1099,12 @@ configure_shra_interactive() {
         return 0
     fi
 
+    # Skip interactive configuration if all required environment variables are set
+    if [[ -n "$SHRA_REGISTRY_TYPE" && -n "$SHRA_REGISTRY_HOST" && -n "$SHRA_REGISTRY_USERNAME" && -n "$SHRA_REGISTRY_PASSWORD" ]]; then
+        clean_info "SHRA environment variables detected - skipping interactive configuration"
+        return 0
+    fi
+
     print_section "SHRA CONFIGURATION"
 
     clean_info "SHRA requires registry configuration to scan container images."
@@ -1533,11 +1539,11 @@ EOF
     # Install or upgrade SHRA
     local helm_cmd=""
     if [[ "$helm_operation" == "upgrade" ]]; then
-        helm_cmd="helm upgrade falcon-shra ./falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment \
+        helm_cmd="helm upgrade falcon-shra crowdstrike/falcon-self-hosted-registry-assessment \
             --namespace $shra_namespace \
             --values shra_values.yaml"
     else
-        helm_cmd="helm install falcon-shra ./falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment \
+        helm_cmd="helm install falcon-shra crowdstrike/falcon-self-hosted-registry-assessment \
             --namespace $shra_namespace \
             --create-namespace \
             --values shra_values.yaml"
