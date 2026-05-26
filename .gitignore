@@ -16,3 +16,6 @@ shra_values_*.yaml
 # Docker config files
 .dockerconfigjson
 dockerconfig.json
+
+# Claude Code settings (may contain credentials)
+.claude/
