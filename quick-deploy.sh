@@ -854,6 +854,13 @@ check_conflicting_resources() {
 
 # Deploy Falcon Platform
 deploy_falcon() {
+    # Skip umbrella chart deployment if only SHRA is enabled
+    if [[ "$INSTALL_SENSOR" == "false" && "$INSTALL_KAC" == "false" && "$INSTALL_IAR" == "false" && "$INSTALL_SHRA" == "true" ]]; then
+        clean_info "Only SHRA is enabled - skipping umbrella chart deployment"
+        clean_info "SHRA will be deployed independently"
+        return 0
+    fi
+
     print_section "FALCON PLATFORM DEPLOYMENT"
 
     # Check for and resolve conflicting resources first
