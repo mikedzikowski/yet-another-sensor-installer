@@ -1569,20 +1569,38 @@ EOF
     fi
 
     echo
-    clean_warning "⚠️  IMPORTANT: SHRA Configuration Required"
-    clean_info "SHRA has been deployed with placeholder configuration."
-    clean_info "You MUST customize the configuration before it will work properly:"
-    echo
-    clean_info "1. Edit the registry credentials and settings in the deployment:"
-    clean_info "   kubectl edit configmap -n $shra_namespace"
-    echo
-    clean_info "2. Configure which registries to scan and authentication"
-    clean_info "3. Adjust storage classes for your Kubernetes cluster"
-    clean_info "4. Set up appropriate RBAC and network policies"
-    echo
-    clean_info "📖 Full documentation: falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment/README.md"
-    clean_info "🔧 Example values: shra_values.yaml (created in current directory)"
-    echo
+
+    # Only show configuration warning if using placeholder values
+    if [[ "$use_interactive_config" != "true" ]]; then
+        clean_warning "⚠️  IMPORTANT: SHRA Configuration Required"
+        clean_info "SHRA has been deployed with placeholder configuration."
+        clean_info "You MUST customize the configuration before it will work properly:"
+        echo
+        clean_info "1. Edit the registry credentials and settings in the deployment:"
+        clean_info "   kubectl edit configmap -n $shra_namespace"
+        echo
+        clean_info "2. Configure which registries to scan and authentication"
+        clean_info "3. Adjust storage classes for your Kubernetes cluster"
+        clean_info "4. Set up appropriate RBAC and network policies"
+        echo
+        clean_info "📖 Full documentation: falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment/README.md"
+        clean_info "🔧 Example values: shra_values.yaml (created in current directory)"
+        echo
+    else
+        clean_success "✅ SHRA Configuration Complete"
+        clean_info "SHRA has been deployed with your registry configuration:"
+        clean_info "• Registry: $SHRA_REGISTRY_TYPE ($SHRA_REGISTRY_HOST)"
+        clean_info "• Authentication: Configured"
+        clean_info "• Storage: Auto-detected for your cluster"
+        clean_info "• Scanning: Will begin according to schedule"
+        echo
+        clean_info "🎯 Monitor scanning activity:"
+        clean_info "   kubectl logs -f falcon-shra-executor-0 -n $shra_namespace"
+        echo
+        clean_info "📊 View results in CrowdStrike Falcon Console:"
+        clean_info "   Container Security → Registry Assessment"
+        echo
+    fi
 }
 
 # Verify deployment
