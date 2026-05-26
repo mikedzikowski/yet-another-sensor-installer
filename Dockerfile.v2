@@ -1,6 +1,0 @@
-FROM nginx:alpine
-RUN apk add --no-cache htop
-RUN echo "SHRA Test Image V2 - $(date)" > /usr/share/nginx/html/test.html
-LABEL version="2.0"
-LABEL description="Second test image for SHRA scanning"
-EXPOSE 80
