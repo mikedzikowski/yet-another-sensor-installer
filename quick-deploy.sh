@@ -1583,7 +1583,7 @@ EOF
         clean_info "3. Adjust storage classes for your Kubernetes cluster"
         clean_info "4. Set up appropriate RBAC and network policies"
         echo
-        clean_info "📖 Full documentation: falcon-helm-main/helm-charts/falcon-self-hosted-registry-assessment/README.md"
+        clean_info "📖 Full documentation: https://github.com/CrowdStrike/falcon-helm/tree/main/helm-charts/falcon-self-hosted-registry-assessment"
         clean_info "🔧 Example values: shra_values.yaml (created in current directory)"
         echo
     else
